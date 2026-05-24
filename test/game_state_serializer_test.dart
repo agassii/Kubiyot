@@ -108,7 +108,7 @@ void main() {
 
       expect(r.activeTurn!.phase, TurnPhase.awaitingSelection);
       expect(r.activeTurn!.rollNumber, 1);
-      expect(r.activeTurn!.temporaryScore, 1000);
+      expect(r.activeTurn!.temporaryScore, 0); // score added in processSelection, not processRoll
       expect(r.activeTurn!.currentRoll.length, 5);
       expect(r.activeTurn!.currentRoll[0].face, DiceFace.one);
       expect(r.activeTurn!.currentRoll[3].face, DiceFace.two);
@@ -355,6 +355,11 @@ void main() {
         () => gm.processRoll(game: restored, rolledFaces: [5, 3]),
         returnsNormally,
       );
+      // [5,3] scores [5]=50 → awaitingSelection; select it to add score
+      if (restored.activeTurn?.phase == TurnPhase.awaitingSelection) {
+        final idx = restored.activeTurn!.rollHistory.last.scoringDice.first.index;
+        gm.processSelection(game: restored, selectedDiceIndices: [idx]);
+      }
       expect(restored.activeTurn!.temporaryScore, greaterThan(1000));
     });
 

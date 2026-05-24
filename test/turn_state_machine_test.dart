@@ -41,7 +41,7 @@ void main() {
       expect(state.rollNumber, 0);
     });
 
-    test('LF-02: roll [1][2][3][4][6] → awaitingSelection, score=0 until selection', () {
+    test('LF-02: roll [1][2][3][4][6] → awaitingSelection, score added after selection', () {
       final state = machine.startNewTurn(playerId: 'p1');
       machine.processRoll(
         state: state,
@@ -50,6 +50,13 @@ void main() {
         isEntered: true,
       );
       expect(state.phase, TurnPhase.awaitingSelection);
+      expect(state.temporaryScore, 0); // score not applied until selection
+      machine.processSelection(
+        state: state,
+        selectedDiceIndices: [0], // the [1]
+        permanentScore: 0,
+        isEntered: true,
+      );
       expect(state.temporaryScore, 100);
     });
 
@@ -348,12 +355,19 @@ void main() {
   // CEILING (Category 6)
   // ===========================================================================
   group('Category 6 — Ceiling', () {
-    test('W-01: 9500 permanent + 400 turn + 100 roll = 10000 → WIN', () {
+    test('W-01: 9500 permanent + 400 turn + 100 selection = 10000 → WIN', () {
       final state = machine.startNewTurn(playerId: 'p1');
       state.temporaryScore = 400;
       machine.processRoll(
         state: state,
-        rolledFaces: [1, 2, 3, 4, 6], // scores 100
+        rolledFaces: [1, 2, 3, 4, 6], // scores [1]=100
+        permanentScore: 9500,
+        isEntered: true,
+      );
+      expect(state.phase, TurnPhase.awaitingSelection);
+      machine.processSelection(
+        state: state,
+        selectedDiceIndices: [0], // the [1]
         permanentScore: 9500,
         isEntered: true,
       );
@@ -361,12 +375,21 @@ void main() {
       expect(state.finalBankedScore, 500);
     });
 
-    test('W-02: 9500 + 400 + 150 = 10050 → ceiling bust', () {
+    test('W-02: selecting both scoring dice when total > 10000 → ceiling bust', () {
       final state = machine.startNewTurn(playerId: 'p1');
       state.temporaryScore = 400;
+      // [1,5,3,4,6]: [1]=100 [5]=50, not a straight, 2 dice score
       machine.processRoll(
         state: state,
-        rolledFaces: [1, 5, 2, 3, 4], // scores 150
+        rolledFaces: [1, 5, 3, 4, 6],
+        permanentScore: 9500,
+        isEntered: true,
+      );
+      expect(state.phase, TurnPhase.awaitingSelection);
+      // Selecting both [1] and [5] → 9500 + 400 + 150 = 10050 → ceiling bust
+      machine.processSelection(
+        state: state,
+        selectedDiceIndices: [0, 1],
         permanentScore: 9500,
         isEntered: true,
       );
@@ -375,11 +398,18 @@ void main() {
       expect(state.temporaryScore, 0);
     });
 
-    test('W-04: 9900 permanent + 0 turn + 100 roll = 10000 → WIN', () {
+    test('W-04: 9900 permanent + 0 turn + 100 selection = 10000 → WIN', () {
       final state = machine.startNewTurn(playerId: 'p1');
       machine.processRoll(
         state: state,
         rolledFaces: [1, 2, 3, 4, 6],
+        permanentScore: 9900,
+        isEntered: true,
+      );
+      expect(state.phase, TurnPhase.awaitingSelection);
+      machine.processSelection(
+        state: state,
+        selectedDiceIndices: [0], // the [1]
         permanentScore: 9900,
         isEntered: true,
       );
@@ -569,11 +599,18 @@ void main() {
       expect(state.finalBankedScore, 400);
     });
 
-    test('IV-06: bank 200 at permanent 9800 → WIN', () {
+    test('IV-06: bank 200 at permanent 9800 → WIN after selection', () {
       final state = machine.startNewTurn(playerId: 'p1');
       machine.processRoll(
         state: state,
-        rolledFaces: [1, 1, 2, 3, 4], // 200 pts
+        rolledFaces: [1, 1, 2, 3, 4], // [1][1] = 200 pts
+        permanentScore: 9800,
+        isEntered: true,
+      );
+      expect(state.phase, TurnPhase.awaitingSelection);
+      machine.processSelection(
+        state: state,
+        selectedDiceIndices: [0, 1], // both [1]s
         permanentScore: 9800,
         isEntered: true,
       );
@@ -619,7 +656,7 @@ void main() {
       expect(fiveContrib.points, 100); // 100 not 50
     });
 
-    test('CR-02: complementary triple context survives Hot Dice re-roll', () {
+    test('CR-02: complementary triple context is cleared on Hot Dice', () {
       final state = machine.startNewTurn(playerId: 'p1');
 
       // Roll 1: [5][5][5][1][1] → all 5 score → Hot Dice
@@ -631,9 +668,10 @@ void main() {
       );
       // 500 + 100 + 100 = 700 + 200 hot dice = 900
       expect(state.phase, TurnPhase.hotDiceForced);
-      expect(state.setAsideTriples[DiceFace.five], 1);
+      // setAsideTriples cleared on Hot Dice (Rule Change #1)
+      expect(state.setAsideTriples, isEmpty);
 
-      // Roll 2 (forced): [5][2][2][6][6] — [5] should still be complementary
+      // Roll 2 (forced): [5][2][2][6][6] — [5] is no longer complementary
       machine.processRoll(
         state: state,
         rolledFaces: [5, 2, 2, 6, 6],
@@ -643,8 +681,8 @@ void main() {
       final lastResult = state.rollHistory.last;
       final fiveContrib = lastResult.contributions
           .firstWhere((c) => c.dice.any((d) => d.face == DiceFace.five));
-      expect(fiveContrib.pattern, ScoringPattern.complementaryBonus);
-      expect(fiveContrib.points, 100);
+      expect(fiveContrib.pattern, ScoringPattern.singleFive); // NOT complementary
+      expect(fiveContrib.points, 50); // NOT 100
     });
   });
 }

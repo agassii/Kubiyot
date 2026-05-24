@@ -226,31 +226,37 @@ void main() {
   // WIN CONDITION
   // ===========================================================================
   group('Win Condition', () {
-    test('WC-01: reaching exactly 10000 ends game immediately', () {
+    test('WC-01: reaching exactly 10000 ends game after selection', () {
       final game = twoPlayerGame(gm);
       final alice = game.players[0];
 
       alice.scoreTiers.add(9800);
       alice.isEntered = true;
 
-      // Alice rolls [1][1] = 200 → exactly 10000 → WIN detected at roll time
+      // Alice rolls [1][1] = 200 → awaitingSelection
       gm.processRoll(game: game, rolledFaces: [1, 1, 2, 3, 4]);
+      expect(game.phase, GamePhase.inProgress); // awaiting selection
 
+      // Alice selects both [1]s → 9800 + 200 = 10000 → WIN
+      gm.processSelection(game: game, selectedDiceIndices: [0, 1]);
       expect(game.phase, GamePhase.complete);
       expect(game.winnerId, alice.id);
       expect(alice.currentScore, 10000);
     });
 
-    test('WC-02: exceeding 10000 is a bust, not a win', () {
+    test('WC-02: exceeding 10000 is a bust when all scoring dice selected', () {
       final game = twoPlayerGame(gm);
       final alice = game.players[0];
 
       alice.scoreTiers.add(9800);
       alice.isEntered = true;
 
-      // Alice rolls 300 → 10100 → ceiling bust
-      gm.processRoll(game: game, rolledFaces: [3, 3, 3, 2, 4]); // 300 pts
-      expect(game.phase, GamePhase.inProgress);
+      // Alice rolls [3][3][3] = 300 pts → awaitingSelection
+      gm.processRoll(game: game, rolledFaces: [3, 3, 3, 2, 4]);
+      expect(game.phase, GamePhase.inProgress); // awaiting selection
+
+      // Alice selects all three 3s → 9800 + 300 = 10100 → ceiling bust
+      gm.processSelection(game: game, selectedDiceIndices: [0, 1, 2]);
       expect(alice.currentScore, 9800); // unchanged
       expect(alice.consecutiveXCount, 1);
     });
@@ -412,8 +418,9 @@ void main() {
       gm.processRoll(game: game, rolledFaces: [2, 3, 4, 6, 6]); // Alice busts
       gm.processRoll(game: game, rolledFaces: [2, 3, 4, 6, 6]); // Bob busts
 
-      // Alice's turn: 9800 + 200 = 10000 → WIN detected at roll time
+      // Alice's turn: 9800 + 200 = 10000 → WIN after selection
       gm.processRoll(game: game, rolledFaces: [1, 1, 2, 3, 4]);
+      gm.processSelection(game: game, selectedDiceIndices: [0, 1]); // both [1]s
 
       expect(game.isComplete, true);
       expect(game.winner?.displayName, 'Alice');

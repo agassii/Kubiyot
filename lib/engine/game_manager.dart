@@ -190,6 +190,10 @@ class GameManager {
       isEntered: player.isEntered,
     );
 
+    if (turn.phase == TurnPhase.turnComplete) {
+      return _handleTurnComplete(game);
+    }
+
     return game;
   }
 

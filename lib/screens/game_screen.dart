@@ -93,7 +93,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             TurnIndicator(
               game: game,
               rollReveal: reveal,
-              onNewGame: game.isComplete ? null : _newGame,
+              onNewGame: _newGame,
             ),
             Expanded(
               child: DiceBoard(

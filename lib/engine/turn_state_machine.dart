@@ -242,21 +242,6 @@ class TurnStateMachine {
       );
     }
 
-    // ── Ceiling check BEFORE adding points ───────────────────────────────────
-    final projected = permanentScore + state.temporaryScore + result.rollPoints;
-    if (projected > 10000) {
-      return _resolveBust(state: state, reason: TurnEndReason.ceilingBust);
-    }
-
-    // ── Win check ────────────────────────────────────────────────────────────
-    if (projected == 10000) {
-      state.temporaryScore += result.rollPoints;
-      return _resolveWin(state);
-    }
-
-    // ── Add points ───────────────────────────────────────────────────────────
-    state.temporaryScore += result.rollPoints;
-
     // ── Hot Dice check — covers theft turns where set-aside total reaches 5 ──
     // In a theft turn, setAsideDice starts pre-populated with (5 - N) sentinels.
     // When the thief scores all N leftover dice, the combined count hits 5.
@@ -264,16 +249,24 @@ class TurnStateMachine {
         (!result.isFarkle &&
             state.setAsideDice.length + result.scoringDice.length == 5);
 
-    _updateSetAsideContext(state, result, forceSetAside: effectivelyHotDice);
-
     if (effectivelyHotDice) {
-      return _resolveHotDice(
-        state: state,
-        permanentScore: permanentScore,
-      );
+      // All scoring dice are auto-set-aside — apply ceiling/win/score now.
+      final projected = permanentScore + state.temporaryScore + result.rollPoints;
+      if (projected > 10000) {
+        return _resolveBust(state: state, reason: TurnEndReason.ceilingBust);
+      }
+      if (projected == 10000) {
+        state.temporaryScore += result.rollPoints;
+        return _resolveWin(state);
+      }
+      state.temporaryScore += result.rollPoints;
+      _updateSetAsideContext(state, result, forceSetAside: true);
+      return _resolveHotDice(state: state, permanentScore: permanentScore);
     }
 
-    // ── Determine next phase ─────────────────────────────────────────────────
+    // ── Awaiting selection ────────────────────────────────────────────────────
+    // Player chooses which scoring dice to keep; ceiling/win checks and score
+    // addition happen in processSelection based on the player's actual choice.
     state.phase = TurnPhase.awaitingSelection;
     return state;
   }
@@ -313,10 +306,31 @@ class TurnStateMachine {
       'Player must select at least one scoring die',
     );
 
-    // Add selected dice to set-aside pool.
+    // Score only the selected dice (player may choose a subset).
+    final selectedPoints = _calculateSelectedPoints(
+      selectedDiceIndices.toSet(), lastResult,
+    );
+
+    // ── Ceiling check ─────────────────────────────────────────────────────────
+    final projected = permanentScore + state.temporaryScore + selectedPoints;
+    if (projected > 10000) {
+      return _resolveBust(state: state, reason: TurnEndReason.ceilingBust);
+    }
+
     final selectedDice = state.currentRoll
         .where((d) => selectedDiceIndices.contains(d.index))
         .toList();
+
+    // ── Win check ─────────────────────────────────────────────────────────────
+    if (projected == 10000) {
+      state.temporaryScore += selectedPoints;
+      state.setAsideDice.addAll(selectedDice);
+      _updateTriplesFromSelection(state, selectedDice);
+      return _resolveWin(state);
+    }
+
+    // ── Add points and update state ───────────────────────────────────────────
+    state.temporaryScore += selectedPoints;
     state.setAsideDice.addAll(selectedDice);
 
     // Update triple tracking for complementary rule.
@@ -445,8 +459,8 @@ class TurnStateMachine {
 
     // Reset set-aside dice — player picks up all 5 again.
     state.setAsideDice.clear();
-    // Note: setAsideTriples is intentionally NOT cleared.
-    // Complementary rule context persists across Hot Dice re-rolls.
+    // setAsideTriples cleared — complementary context does not survive Hot Dice.
+    state.setAsideTriples.clear();
 
     state.phase = TurnPhase.hotDiceForced;
     return state;
@@ -512,6 +526,19 @@ class TurnStateMachine {
   // ---------------------------------------------------------------------------
   // Private — Set-aside context updates
   // ---------------------------------------------------------------------------
+
+  /// Points for a subset of scoring dice.
+  /// A contribution's points are included only if ALL its dice are selected.
+  int _calculateSelectedPoints(Set<int> selectedIndices, ScoringResult lastResult) {
+    int points = 0;
+    for (final contrib in lastResult.contributions) {
+      final contribIndices = contrib.dice.map((d) => d.index).toSet();
+      if (contribIndices.every((i) => selectedIndices.contains(i))) {
+        points += contrib.points;
+      }
+    }
+    return points;
+  }
 
   void _updateSetAsideContext(TurnState state, ScoringResult result,
       {bool forceSetAside = false}) {
