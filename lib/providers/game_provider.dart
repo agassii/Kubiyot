@@ -67,14 +67,16 @@ class GameNotifier extends ChangeNotifier {
 
     // After processRoll, `turn` is mutated in place — currentRoll and
     // rollHistory.last are set even if _handleTurnComplete replaced activeTurn.
+    // Bug #4: show dice for ALL rolls, not only terminal / hot-dice ones.
     final needsReveal = turn.rollHistory.isNotEmpty &&
         (turn.phase == TurnPhase.turnComplete ||
-            turn.phase == TurnPhase.hotDiceForced);
+            turn.phase == TurnPhase.hotDiceForced ||
+            turn.phase == TurnPhase.awaitingSelection);
 
     if (needsReveal) {
       _rollReveal = RollReveal(
         rolledDice: List.from(turn.currentRoll),
-        // setAsideDice is cleared for hotDiceForced; preserved for farkle/bust.
+        // setAsideDice is cleared for hotDiceForced; preserved otherwise.
         setAsideDice: List.from(turn.setAsideDice),
         scoringResult: turn.rollHistory.last,
         endReason: turn.endReason,
@@ -84,7 +86,12 @@ class GameNotifier extends ChangeNotifier {
             : 0,
         playerName: playerName,
       );
-      Future.delayed(const Duration(milliseconds: 1800), () {
+      // Selection rolls: auto-dismiss after the animation settles (1300 ms).
+      // Terminal / hot-dice reveals stay longer so the player can read them.
+      final delay = turn.phase == TurnPhase.awaitingSelection
+          ? const Duration(milliseconds: 1300)
+          : const Duration(milliseconds: 1800);
+      Future.delayed(delay, () {
         if (!_isDisposed && _rollReveal != null) {
           _rollReveal = null;
           notifyListeners();
