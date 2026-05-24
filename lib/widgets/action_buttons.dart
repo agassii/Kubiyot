@@ -11,6 +11,7 @@ class ActionButtons extends StatelessWidget {
   final VoidCallback onSteal;
   final VoidCallback onSkip;
   final VoidCallback onNewGame;
+  final VoidCallback onDismissReveal;
 
   const ActionButtons({
     super.key,
@@ -23,6 +24,7 @@ class ActionButtons extends StatelessWidget {
     required this.onSteal,
     required this.onSkip,
     required this.onNewGame,
+    required this.onDismissReveal,
   });
 
   @override
@@ -32,7 +34,13 @@ class ActionButtons extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (isGameOver)
+          if (actions.isRollReveal)
+            _Btn(
+              label: 'Continue ▶',
+              color: const Color(0xFF374151),
+              onPressed: onDismissReveal,
+            )
+          else if (isGameOver)
             _Btn(label: 'New Game', color: Colors.indigo, onPressed: onNewGame)
           else if (actions.isStealWindow)
             _buildStealRow()

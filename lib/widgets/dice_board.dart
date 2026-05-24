@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../engine/game_manager.dart';
 import '../engine/turn_state_machine.dart';
+import '../engine/scoring_calculator.dart';
+import '../models/roll_reveal.dart';
 
 // ── Die display model ─────────────────────────────────────────────────────────
 
@@ -8,7 +10,7 @@ enum _DieStatus { blank, setAside, scoring, nonScoring, invisible }
 
 class _DieData {
   final int index;
-  final int faceValue; // 0 = blank
+  final int faceValue; // 0 = show placeholder "?"
   final _DieStatus status;
   const _DieData(this.index, this.faceValue, this.status);
 }
@@ -21,6 +23,7 @@ class DiceBoard extends StatelessWidget {
   final TheftContext? theftContext;
   final Set<int> selectedIndices;
   final void Function(int index) onDieTapped;
+  final RollReveal? rollReveal;
 
   const DiceBoard({
     super.key,
@@ -29,111 +32,144 @@ class DiceBoard extends StatelessWidget {
     required this.theftContext,
     required this.selectedIndices,
     required this.onDieTapped,
+    this.rollReveal,
   });
 
   @override
   Widget build(BuildContext context) {
-    final dice = _computeDice();
+    final zone1 = _computeZone1();
+    final zone2 = _computeZone2();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (gamePhase == GamePhase.stealWindow) ...[
+          // Steal window header
+          if (gamePhase == GamePhase.stealWindow && rollReveal == null) ...[
             const Text(
               'Dice available to steal',
               style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
             ),
             const SizedBox(height: 12),
           ],
-          // Row of 3
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (int i = 0; i < 3; i++) ...[
-                _SingleDie(
-                  data: dice[i],
-                  isSelected: selectedIndices.contains(dice[i].index),
-                  onTap: dice[i].status == _DieStatus.scoring
-                      ? () => onDieTapped(dice[i].index)
-                      : null,
-                ),
-                if (i < 2) const SizedBox(width: 12),
-              ],
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Row of 2 (centered)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (int i = 3; i < 5; i++) ...[
-                _SingleDie(
-                  data: dice[i],
-                  isSelected: selectedIndices.contains(dice[i].index),
-                  onTap: dice[i].status == _DieStatus.scoring
-                      ? () => onDieTapped(dice[i].index)
-                      : null,
-                ),
-                if (i < 4) const SizedBox(width: 12),
-              ],
-            ],
-          ),
+
+          // Zone 1: locked / set-aside dice
+          if (zone1.isNotEmpty) ...[
+            _buildZoneLabel('LOCKED', const Color(0xFFFFD700)),
+            const SizedBox(height: 6),
+            _buildDiceRow(zone1, selectable: false),
+            const SizedBox(height: 18),
+            const Divider(color: Color(0xFF2A2A4A), height: 1),
+            const SizedBox(height: 14),
+          ],
+
+          // Zone 2: active / rolling dice
+          _buildDiceRow(zone2, selectable: true),
         ],
       ),
     );
   }
 
-  List<_DieData> _computeDice() {
-    // Steal window: show N blank dice as "available to steal"
-    if (gamePhase == GamePhase.stealWindow && theftContext != null) {
-      final n = theftContext!.availableDiceCount;
-      return List.generate(
-        5,
-        (i) => _DieData(i, 0, i < n ? _DieStatus.blank : _DieStatus.invisible),
-      );
+  // ── Zone 1: locked set-aside dice ─────────────────────────────────────────
+
+  List<_DieData> _computeZone1() {
+    final source = rollReveal != null ? rollReveal!.setAsideDice : (turn?.setAsideDice ?? []);
+    final skip = rollReveal != null
+        ? rollReveal!.sentinelCount
+        : (turn?.isTheftTurn == true
+            ? (5 - (turn!.theftContext?.availableDiceCount ?? 5))
+            : 0);
+
+    return source
+        .skip(skip)
+        .map((d) => _DieData(d.index, d.face.value, _DieStatus.setAside))
+        .toList();
+  }
+
+  // ── Zone 2: active dice ───────────────────────────────────────────────────
+
+  List<_DieData> _computeZone2() {
+    // ── Steal window ─────────────────────────────────────────────────────
+    if (gamePhase == GamePhase.stealWindow && rollReveal == null) {
+      final n = theftContext?.availableDiceCount ?? 0;
+      return List.generate(n, (i) => _DieData(i, 0, _DieStatus.blank));
+    }
+
+    // ── Roll reveal ───────────────────────────────────────────────────────
+    if (rollReveal != null) {
+      final scoringIndices = rollReveal!.scoringResult.scoringDice
+          .map((d) => d.index)
+          .toSet();
+      return rollReveal!.rolledDice.map((d) {
+        final status = scoringIndices.contains(d.index)
+            ? _DieStatus.scoring
+            : _DieStatus.nonScoring;
+        return _DieData(d.index, d.face.value, status);
+      }).toList();
     }
 
     if (turn == null) {
       return List.generate(5, (i) => _DieData(i, 0, _DieStatus.blank));
     }
 
-    final setAsideByIndex = {for (final d in turn!.setAsideDice) d.index: d};
-    final currentRollByIndex = {for (final d in turn!.currentRoll) d.index: d};
-    final scoringIndices = turn!.rollHistory.isNotEmpty
-        ? turn!.rollHistory.last.scoringDice.map((d) => d.index).toSet()
-        : <int>{};
+    // ── awaitingSelection: show rolled dice with scoring/nonScoring colors ─
+    if (turn!.phase == TurnPhase.awaitingSelection) {
+      final scoringIndices = turn!.rollHistory.isNotEmpty
+          ? turn!.rollHistory.last.scoringDice.map((d) => d.index).toSet()
+          : <int>{};
+      return turn!.currentRoll.map((d) => _DieData(
+            d.index,
+            d.face.value,
+            scoringIndices.contains(d.index)
+                ? _DieStatus.scoring
+                : _DieStatus.nonScoring,
+          )).toList();
+    }
 
-    // In theft turns, the first (5 - availableDiceCount) entries in setAsideDice
-    // are sentinels — render them as invisible placeholders.
-    final sentinelCount = turn!.isTheftTurn
-        ? (5 - (turn!.theftContext?.availableDiceCount ?? 5))
-        : 0;
+    // ── All other phases: show N blank placeholder dice ────────────────────
+    // N = availableDiceCount (already accounts for hotDiceForced = 5)
+    final n = turn!.availableDiceCount;
+    return List.generate(n, (i) => _DieData(i, 0, _DieStatus.blank));
+  }
 
-    return List.generate(5, (i) {
-      if (i < sentinelCount) return _DieData(i, 0, _DieStatus.invisible);
+  // ── Rendering helpers ─────────────────────────────────────────────────────
 
-      if (setAsideByIndex.containsKey(i)) {
-        return _DieData(i, setAsideByIndex[i]!.face.value, _DieStatus.setAside);
-      }
+  Widget _buildZoneLabel(String label, Color color) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 2),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color.withValues(alpha: 0.7),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
 
-      if (turn!.phase == TurnPhase.hotDiceForced) {
-        return _DieData(i, 0, _DieStatus.blank);
-      }
-
-      if (currentRollByIndex.containsKey(i) &&
-          turn!.phase == TurnPhase.awaitingSelection) {
-        final die = currentRollByIndex[i]!;
-        return _DieData(
-          i,
-          die.face.value,
-          scoringIndices.contains(i) ? _DieStatus.scoring : _DieStatus.nonScoring,
-        );
-      }
-
-      return _DieData(i, 0, _DieStatus.blank);
-    });
+  Widget _buildDiceRow(List<_DieData> data, {required bool selectable}) {
+    if (data.isEmpty) return const SizedBox.shrink();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 0; i < data.length; i++) ...[
+          _SingleDie(
+            data: data[i],
+            isSelected: selectedIndices.contains(data[i].index),
+            onTap: selectable && data[i].status == _DieStatus.scoring
+                ? () => onDieTapped(data[i].index)
+                : null,
+          ),
+          if (i < data.length - 1) const SizedBox(width: 10),
+        ],
+      ],
+    );
   }
 }
 
@@ -149,19 +185,19 @@ class _SingleDie extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (data.status == _DieStatus.invisible) {
-      return const SizedBox(width: 70, height: 70);
+      return const SizedBox(width: 60, height: 60);
     }
 
     return AnimatedSlide(
-      offset: isSelected ? const Offset(0, -0.09) : Offset.zero,
+      offset: isSelected ? const Offset(0, -0.10) : Offset.zero,
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOut,
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          width: 70,
-          height: 70,
+          width: 60,
+          height: 60,
           decoration: BoxDecoration(
             color: _bgColor,
             borderRadius: BorderRadius.circular(12),
@@ -176,21 +212,35 @@ class _SingleDie extends StatelessWidget {
               ),
             ],
           ),
-          child: Center(
-            child: data.faceValue > 0
-                ? Text(
-                    '${data.faceValue}',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: _textColor,
-                    ),
-                  )
-                : null,
-          ),
+          child: Center(child: _buildContent()),
         ),
       ),
     );
+  }
+
+  Widget? _buildContent() {
+    if (data.faceValue > 0) {
+      return Text(
+        '${data.faceValue}',
+        style: TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+          color: _textColor,
+        ),
+      );
+    }
+    // Blank die: show "?" placeholder
+    if (data.status == _DieStatus.blank) {
+      return const Text(
+        '?',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF3A3A6A),
+        ),
+      );
+    }
+    return null;
   }
 
   Color get _bgColor => switch (data.status) {

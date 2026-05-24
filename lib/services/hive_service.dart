@@ -14,7 +14,7 @@ import '../engine/game_manager.dart';
 import 'game_state_serializer.dart';
 
 class HiveService {
-  static const String boxName = 'kubiyot_game';
+  static const String boxName = 'kubiyot_game_v2';
   static const String _key = 'active_game';
 
   late final Box<String> _box;

@@ -1,15 +1,8 @@
-// =============================================================================
-// turn_provider.dart
-// Kubiyot — Derived providers exposing current turn state to the UI
-//
-// All state lives in GameState (via gameProvider). These are computed
-// selectors — no separate StateNotifier is needed.
-// =============================================================================
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/game_manager.dart';
 import '../engine/player_manager.dart';
 import '../engine/turn_state_machine.dart';
+import '../models/roll_reveal.dart';
 import 'game_provider.dart';
 
 // ── State selectors ───────────────────────────────────────────────────────────
@@ -42,16 +35,20 @@ final isStealWindowProvider = Provider<bool>((ref) {
   return ref.watch(gameProvider).hasStealOpportunity;
 });
 
+final rollRevealProvider = Provider<RollReveal?>((ref) {
+  return ref.watch(gameProvider).rollReveal;
+});
+
 // ── Available actions ─────────────────────────────────────────────────────────
 
 /// Snapshot of what the current player is allowed to do right now.
-/// The UI uses this to enable/disable buttons without duplicating phase logic.
 class TurnActions {
   final bool canRoll;
-  final bool mustRoll;    // roll is forced — banking is not allowed
-  final bool mustSelect;  // player must choose dice before anything else
+  final bool mustRoll;
+  final bool mustSelect;
   final bool canBank;
   final bool isStealWindow;
+  final bool isRollReveal;
 
   const TurnActions({
     this.canRoll = false,
@@ -59,12 +56,18 @@ class TurnActions {
     this.mustSelect = false,
     this.canBank = false,
     this.isStealWindow = false,
+    this.isRollReveal = false,
   });
 
   static const none = TurnActions();
 }
 
 final turnActionsProvider = Provider<TurnActions>((ref) {
+  // Suppress all normal actions while showing a roll reveal.
+  if (ref.watch(rollRevealProvider) != null) {
+    return const TurnActions(isRollReveal: true);
+  }
+
   final notifier = ref.watch(gameProvider);
   final game = notifier.state;
   if (game == null || game.isComplete) return TurnActions.none;

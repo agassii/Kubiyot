@@ -1,17 +1,10 @@
-// =============================================================================
-// game_provider.dart
-// Kubiyot — Reactive game state bridge between GameManager and the UI
-//
-// Uses ChangeNotifierProvider so every notifyListeners() call triggers a
-// rebuild regardless of object identity (GameManager mutates in place).
-// =============================================================================
-
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/game_manager.dart';
 import '../engine/scoring_calculator.dart';
 import '../engine/turn_state_machine.dart';
+import '../models/roll_reveal.dart';
 import '../services/hive_service.dart';
 
 class GameNotifier extends ChangeNotifier {
@@ -19,12 +12,15 @@ class GameNotifier extends ChangeNotifier {
   final Random _random;
   final HiveService? _hive;
   GameState? _state;
+  bool _isDisposed = false;
+
+  RollReveal? _rollReveal;
+  RollReveal? get rollReveal => _rollReveal;
 
   GameNotifier({GameManager? manager, Random? random, HiveService? hiveService})
       : _manager = manager ?? GameManager(),
         _random = random ?? Random(),
         _hive = hiveService {
-    // Restore any in-progress game from disk (synchronous — box already open).
     _state = hiveService?.loadGame();
   }
 
@@ -39,6 +35,7 @@ class GameNotifier extends ChangeNotifier {
     List<String> playerNames, {
     GameSettings settings = const GameSettings(),
   }) {
+    _rollReveal = null;
     _state = _manager.createGame(playerNames: playerNames, settings: settings);
     _save();
     notifyListeners();
@@ -46,6 +43,7 @@ class GameNotifier extends ChangeNotifier {
 
   void startGame() {
     assert(_state != null, 'Call createGame first');
+    _rollReveal = null;
     _state = _manager.startGame(_state!);
     _save();
     notifyListeners();
@@ -53,16 +51,56 @@ class GameNotifier extends ChangeNotifier {
 
   // ── Turn actions ──────────────────────────────────────────────────────────
 
-  /// Generates N random dice (N = activeTurn.availableDiceCount) and processes
-  /// the roll. With the theft-turn sentinel approach, availableDiceCount
-  /// automatically reflects the correct leftover count.
   void rollDice() {
     assert(_state?.activeTurn != null, 'No active turn to roll');
-    final n = _state!.activeTurn!.availableDiceCount;
+    final turn = _state!.activeTurn!;
+
+    // Capture the rolling player's name before the engine may advance turns.
+    final playerName = _state!.players
+        .firstWhere((p) => p.id == turn.playerId,
+            orElse: () => _state!.currentPlayer)
+        .displayName;
+
+    final n = turn.availableDiceCount;
     final faces = List.generate(n, (_) => _random.nextInt(6) + 1);
     _state = _manager.processRoll(game: _state!, rolledFaces: faces);
+
+    // After processRoll, `turn` is mutated in place — currentRoll and
+    // rollHistory.last are set even if _handleTurnComplete replaced activeTurn.
+    final needsReveal = turn.rollHistory.isNotEmpty &&
+        (turn.phase == TurnPhase.turnComplete ||
+            turn.phase == TurnPhase.hotDiceForced);
+
+    if (needsReveal) {
+      _rollReveal = RollReveal(
+        rolledDice: List.from(turn.currentRoll),
+        // setAsideDice is cleared for hotDiceForced; preserved for farkle/bust.
+        setAsideDice: List.from(turn.setAsideDice),
+        scoringResult: turn.rollHistory.last,
+        endReason: turn.endReason,
+        isHotDice: turn.phase == TurnPhase.hotDiceForced,
+        sentinelCount: turn.isTheftTurn
+            ? (5 - (turn.theftContext?.availableDiceCount ?? 5))
+            : 0,
+        playerName: playerName,
+      );
+      Future.delayed(const Duration(milliseconds: 1800), () {
+        if (!_isDisposed && _rollReveal != null) {
+          _rollReveal = null;
+          notifyListeners();
+        }
+      });
+    }
+
     _save();
     notifyListeners();
+  }
+
+  void dismissRollReveal() {
+    if (_rollReveal != null) {
+      _rollReveal = null;
+      notifyListeners();
+    }
   }
 
   void selectDice(List<int> indices) {
@@ -93,10 +131,10 @@ class GameNotifier extends ChangeNotifier {
 
   void _save() {
     if (_hive == null || _state == null) return;
-    _hive!.saveGame(_state!); // Future<void> — fire-and-forget is intentional
+    _hive!.saveGame(_state!);
   }
 
-  // ── Queries (delegates to GameManager so logic stays in the engine) ────────
+  // ── Queries ────────────────────────────────────────────────────────────────
 
   bool get canBank =>
       _state != null && _manager.canCurrentPlayerBank(_state!);
@@ -107,6 +145,12 @@ class GameNotifier extends ChangeNotifier {
 
   bool get hasStealOpportunity =>
       _state != null && _manager.hasStealOpportunity(_state!);
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
 }
 
 final gameProvider = ChangeNotifierProvider<GameNotifier>(
