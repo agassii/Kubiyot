@@ -1,9 +1,11 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/game_manager.dart';
 import '../engine/turn_state_machine.dart';
 import '../engine/scoring_calculator.dart';
 import '../models/roll_reveal.dart';
+import '../providers/language_provider.dart';
 
 // ── Die display model ─────────────────────────────────────────────────────────
 
@@ -18,7 +20,7 @@ class _DieData {
 
 // ── DiceBoard ─────────────────────────────────────────────────────────────────
 
-class DiceBoard extends StatelessWidget {
+class DiceBoard extends ConsumerWidget {
   final TurnState? turn;
   final GamePhase gamePhase;
   final TheftContext? theftContext;
@@ -37,7 +39,8 @@ class DiceBoard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     final zone1 = _computeZone1();
     final zone2 = _computeZone2();
 
@@ -47,14 +50,14 @@ class DiceBoard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (gamePhase == GamePhase.stealWindow && rollReveal == null) ...[
-            const Text(
-              'Dice available to steal',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+            Text(
+              s.diceToSteal,
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
             ),
             const SizedBox(height: 12),
           ],
           if (zone1.isNotEmpty) ...[
-            _buildZoneLabel('LOCKED', const Color(0xFFFFD700)),
+            _buildZoneLabel(s.locked, const Color(0xFFFFD700)),
             const SizedBox(height: 6),
             _buildDiceRow(zone1, selectable: false),
             const SizedBox(height: 18),

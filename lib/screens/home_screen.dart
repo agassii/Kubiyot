@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../l10n/app_strings.dart';
 import '../providers/game_provider.dart';
+import '../providers/language_provider.dart';
+import '../widgets/help_modal.dart';
+import '../widgets/lang_toggle.dart';
 import 'game_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -31,10 +35,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _setPlayerCount(int count) {
+    final s = ref.read(stringsProvider);
     setState(() {
       if (count > _playerCount) {
         for (int i = _playerCount; i < count; i++) {
-          _controllers.add(TextEditingController(text: 'Player ${i + 1}'));
+          _controllers.add(TextEditingController(text: s.playerDefault(i + 1)));
         }
       } else {
         for (int i = count; i < _playerCount; i++) {
@@ -53,13 +58,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _startGame() {
+    final s = ref.read(stringsProvider);
     final names = [
       for (int i = 0; i < _controllers.length; i++)
         _controllers[i].text.trim().isEmpty
-            ? 'Player ${i + 1}'
+            ? s.playerDefault(i + 1)
             : _controllers[i].text.trim(),
     ];
-    // createGame overwrites any existing Hive save automatically.
     ref.read(gameProvider).createGame(names);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const GameScreen()),
@@ -68,6 +73,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     final savedGame = ref.watch(gameProvider).state;
     final hasSavedGame = savedGame != null && !savedGame.isComplete;
 
@@ -75,11 +81,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: const Color(0xFF1A1A2E),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Title ──────────────────────────────────────────────────
+              // ── Top bar: help + language toggle ────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  GestureDetector(
+                    onTap: () => HelpModal.show(context),
+                    child: const Icon(
+                      Icons.help_outline,
+                      color: Color(0xFF4B5563),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const LangToggle(),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // ── Title ───────────────────────────────────────────────────
               Center(
                 child: Column(
                   children: [
@@ -93,7 +117,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'A dice game for 2–6 players',
+                      s.appSubtitle,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.4),
                         fontSize: 14,
@@ -104,21 +128,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 32),
 
-              // ── Saved game banner ──────────────────────────────────────
+              // ── Saved game banner ───────────────────────────────────────
               if (hasSavedGame) ...[
                 _SavedGameBanner(
                   game: savedGame!,
+                  s: s,
                   onContinue: _continueSavedGame,
                 ),
                 const SizedBox(height: 24),
-                const Row(
+                Row(
                   children: [
-                    Expanded(child: Divider(color: Color(0xFF2A2A4A))),
+                    const Expanded(child: Divider(color: Color(0xFF2A2A4A))),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'OR START A NEW GAME',
-                        style: TextStyle(
+                        s.orStartNew,
+                        style: const TextStyle(
                           color: Color(0xFF4B5563),
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -126,15 +151,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                     ),
-                    Expanded(child: Divider(color: Color(0xFF2A2A4A))),
+                    const Expanded(child: Divider(color: Color(0xFF2A2A4A))),
                   ],
                 ),
                 const SizedBox(height: 24),
               ] else
                 const SizedBox(height: 8),
 
-              // ── Player count ───────────────────────────────────────────
-              _sectionLabel('Number of Players'),
+              // ── Player count ────────────────────────────────────────────
+              _sectionLabel(s.numPlayers),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -150,40 +175,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 28),
 
-              // ── Player names ───────────────────────────────────────────
-              _sectionLabel('Player Names'),
+              // ── Player names ────────────────────────────────────────────
+              _sectionLabel(s.playerNames),
               const SizedBox(height: 10),
               for (int i = 0; i < _playerCount; i++) ...[
                 _NameField(
                   controller: _controllers[i],
-                  playerNumber: i + 1,
+                  label: s.playerLabel(i + 1),
                 ),
                 if (i < _playerCount - 1) const SizedBox(height: 8),
               ],
               const SizedBox(height: 28),
 
-              // ── Game mode ──────────────────────────────────────────────
-              _sectionLabel('Game Mode'),
+              // ── Game mode ───────────────────────────────────────────────
+              _sectionLabel(s.gameMode),
               const SizedBox(height: 10),
-              const _ModeRow(
-                label: 'Local — Pass & Play',
-                isSelected: true,
-              ),
+              _ModeRow(label: s.modeLocal, isSelected: true),
               const SizedBox(height: 8),
-              const _ModeRow(
-                label: 'vs Computer',
+              _ModeRow(
+                label: s.modeComputer,
                 isSelected: false,
                 comingSoon: true,
+                comingSoonLabel: s.comingSoon,
               ),
               const SizedBox(height: 8),
-              const _ModeRow(
-                label: 'Online Multiplayer',
+              _ModeRow(
+                label: s.modeOnline,
                 isSelected: false,
                 comingSoon: true,
+                comingSoonLabel: s.comingSoon,
               ),
               const SizedBox(height: 44),
 
-              // ── Start button ───────────────────────────────────────────
+              // ── Start button ────────────────────────────────────────────
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -197,9 +221,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'Start Game',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  child: Text(
+                    s.startGame,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -248,7 +273,9 @@ class _CountChip extends StatelessWidget {
           color: isSelected ? const Color(0xFF3A86FF) : const Color(0xFF16213E),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? const Color(0xFF3A86FF) : const Color(0xFF2A2A4A),
+            color: isSelected
+                ? const Color(0xFF3A86FF)
+                : const Color(0xFF2A2A4A),
             width: 1.5,
           ),
         ),
@@ -270,16 +297,21 @@ class _CountChip extends StatelessWidget {
 // ── Saved game banner ─────────────────────────────────────────────────────────
 
 class _SavedGameBanner extends StatelessWidget {
-  final dynamic game; // GameState
+  final dynamic game;
+  final AppStrings s;
   final VoidCallback onContinue;
 
-  const _SavedGameBanner({required this.game, required this.onContinue});
+  const _SavedGameBanner({
+    required this.game,
+    required this.s,
+    required this.onContinue,
+  });
 
   @override
   Widget build(BuildContext context) {
     final players = game.players as List;
     final playerNames =
-        players.map((p) => p.displayName as String).join(' vs ');
+        players.map((p) => p.displayName as String).join(s.vsSeparator);
     final current = game.currentPlayer;
 
     return Container(
@@ -297,9 +329,9 @@ class _SavedGameBanner extends StatelessWidget {
               const Icon(Icons.save_rounded,
                   color: Color(0xFF3A86FF), size: 16),
               const SizedBox(width: 8),
-              const Text(
-                'Saved Game',
-                style: TextStyle(
+              Text(
+                s.savedGame,
+                style: const TextStyle(
                   color: Color(0xFF3A86FF),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -316,7 +348,8 @@ class _SavedGameBanner extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            '${current.displayName}\'s turn  •  ${current.currentScore} pts',
+            s.savedTurnInfo(
+                current.displayName as String, current.currentScore as int),
             style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
           ),
           const SizedBox(height: 14),
@@ -332,8 +365,11 @@ class _SavedGameBanner extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text('Continue Game',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              child: Text(
+                s.continueGame,
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ],
@@ -346,9 +382,9 @@ class _SavedGameBanner extends StatelessWidget {
 
 class _NameField extends StatelessWidget {
   final TextEditingController controller;
-  final int playerNumber;
+  final String label;
 
-  const _NameField({required this.controller, required this.playerNumber});
+  const _NameField({required this.controller, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -356,11 +392,12 @@ class _NameField extends StatelessWidget {
       controller: controller,
       style: const TextStyle(color: Colors.white, fontSize: 15),
       decoration: InputDecoration(
-        labelText: 'Player $playerNumber',
+        labelText: label,
         labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
         filled: true,
         fillColor: const Color(0xFF16213E),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: Color(0xFF2A2A4A)),
@@ -384,6 +421,7 @@ class _ModeRow extends StatelessWidget {
   final String label;
   final bool isSelected;
   final bool comingSoon;
+  final String comingSoonLabel;
   final VoidCallback? onTap;
 
   const _ModeRow({
@@ -391,6 +429,7 @@ class _ModeRow extends StatelessWidget {
     required this.label,
     required this.isSelected,
     this.comingSoon = false,
+    this.comingSoonLabel = 'Coming Soon',
     this.onTap,
   });
 
@@ -405,7 +444,9 @@ class _ModeRow extends StatelessWidget {
           color: const Color(0xFF16213E),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? const Color(0xFF3A86FF) : const Color(0xFF2A2A4A),
+            color: isSelected
+                ? const Color(0xFF3A86FF)
+                : const Color(0xFF2A2A4A),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -417,7 +458,9 @@ class _ModeRow extends StatelessWidget {
               height: 18,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected ? const Color(0xFF3A86FF) : Colors.transparent,
+                color: isSelected
+                    ? const Color(0xFF3A86FF)
+                    : Colors.transparent,
                 border: Border.all(
                   color: isSelected
                       ? const Color(0xFF3A86FF)
@@ -443,14 +486,15 @@ class _ModeRow extends StatelessWidget {
             ),
             if (comingSoon)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2A2A4A),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  'Coming Soon',
-                  style: TextStyle(
+                child: Text(
+                  comingSoonLabel,
+                  style: const TextStyle(
                     color: Color(0xFF4B5563),
                     fontSize: 10,
                     fontWeight: FontWeight.w500,

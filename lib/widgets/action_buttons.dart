@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/language_provider.dart';
 import '../providers/turn_provider.dart';
 
-class ActionButtons extends StatelessWidget {
+class ActionButtons extends ConsumerWidget {
   final TurnActions actions;
   final bool hasSelection;
   final bool isGameOver;
@@ -28,7 +30,8 @@ class ActionButtons extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
@@ -36,30 +39,30 @@ class ActionButtons extends StatelessWidget {
         children: [
           if (actions.isRollReveal)
             _Btn(
-              label: 'Continue ▶',
+              label: s.continueBtn,
               color: const Color(0xFF374151),
               onPressed: onDismissReveal,
             )
           else if (isGameOver)
-            _Btn(label: 'New Game', color: Colors.indigo, onPressed: onNewGame)
+            _Btn(label: s.newGame, color: Colors.indigo, onPressed: onNewGame)
           else if (actions.isStealWindow)
-            _buildStealRow()
+            _buildStealRow(s)
           else if (actions.mustSelect)
-            _buildConfirmBtn()
+            _buildConfirmBtn(s)
           else
-            _buildPlayRow(),
+            _buildPlayRow(s),
         ],
       ),
     );
   }
 
-  Widget _buildPlayRow() {
+  Widget _buildPlayRow(s) {
     return Row(
       children: [
         if (actions.canRoll)
           Expanded(
             child: _Btn(
-              label: 'Roll 🎲',
+              label: s.roll,
               color: const Color(0xFF3A86FF),
               onPressed: onRoll,
             ),
@@ -68,7 +71,7 @@ class ActionButtons extends StatelessWidget {
         if (actions.canBank)
           Expanded(
             child: _Btn(
-              label: 'Bank ✓',
+              label: s.bank,
               color: const Color(0xFF06D6A0),
               onPressed: onBank,
             ),
@@ -77,20 +80,20 @@ class ActionButtons extends StatelessWidget {
     );
   }
 
-  Widget _buildConfirmBtn() {
+  Widget _buildConfirmBtn(s) {
     return _Btn(
-      label: hasSelection ? 'Confirm Selection ▶' : 'Select at least one die',
+      label: hasSelection ? s.confirmSelection : s.selectOneDie,
       color: const Color(0xFF7C3AED),
       onPressed: hasSelection ? onConfirm : null,
     );
   }
 
-  Widget _buildStealRow() {
+  Widget _buildStealRow(s) {
     return Row(
       children: [
         Expanded(
           child: _Btn(
-            label: 'Steal ⚡',
+            label: s.steal,
             color: const Color(0xFFFF9F1C),
             onPressed: onSteal,
           ),
@@ -98,7 +101,7 @@ class ActionButtons extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _Btn(
-            label: 'Skip ▶',
+            label: s.skip,
             color: const Color(0xFF6B7280),
             onPressed: onSkip,
           ),

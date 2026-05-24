@@ -4,6 +4,8 @@ import '../engine/game_manager.dart';
 import '../providers/game_provider.dart';
 import '../providers/turn_provider.dart';
 import '../widgets/dice_board.dart';
+import '../widgets/help_modal.dart';
+import '../widgets/lang_toggle.dart';
 import '../widgets/score_panel.dart';
 import '../widgets/turn_indicator.dart';
 import '../widgets/action_buttons.dart';
@@ -88,6 +90,29 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // ── Top bar: help + language toggle ─────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  GestureDetector(
+                    onTap: () => HelpModal.show(context),
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.help_outline,
+                        color: Color(0xFF4B5563),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const LangToggle(),
+                  const SizedBox(width: 4),
+                ],
+              ),
+            ),
             ScorePanel(
               players: game.players,
               currentPlayerIndex: game.currentPlayerIndex,

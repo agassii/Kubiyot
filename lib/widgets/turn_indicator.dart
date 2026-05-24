@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/game_manager.dart';
 import '../engine/turn_state_machine.dart';
+import '../l10n/app_strings.dart';
 import '../models/roll_reveal.dart';
+import '../providers/language_provider.dart';
 
-class TurnIndicator extends StatelessWidget {
+class TurnIndicator extends ConsumerWidget {
   final GameState game;
   final RollReveal? rollReveal;
   final VoidCallback? onNewGame;
@@ -16,7 +19,8 @@ class TurnIndicator extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -26,34 +30,34 @@ class TurnIndicator extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: rollReveal != null
-          ? _buildRevealRow()
+          ? _buildRevealRow(s)
           : game.isComplete
-              ? _buildWinRow()
-              : _buildTurnRow(),
+              ? _buildWinRow(s)
+              : _buildTurnRow(s),
     );
   }
 
   // ── Roll reveal message ────────────────────────────────────────────────────
 
-  Widget _buildRevealRow() {
+  Widget _buildRevealRow(AppStrings s) {
     final reveal = rollReveal!;
     final String message;
     final Color color;
 
     if (reveal.isHotDice) {
-      message = '🔥  ${reveal.playerName} — HOT DICE!  +200';
+      message = s.hotDice(reveal.playerName);
       color = const Color(0xFFFF9F1C);
     } else if (reveal.isFarkle) {
-      message = '💥  ${reveal.playerName} — FARKLE!';
+      message = s.farkle(reveal.playerName);
       color = const Color(0xFFEF4444);
     } else if (reveal.isCeilingBust) {
-      message = '💥  ${reveal.playerName} — BUST! Over 10,000';
+      message = s.ceilingBust(reveal.playerName);
       color = const Color(0xFFEF4444);
     } else if (reveal.isWin) {
-      message = '🏆  ${reveal.playerName} wins!';
+      message = s.winsReveal(reveal.playerName);
       color = const Color(0xFFFFD700);
     } else {
-      return _buildTurnRow();
+      return _buildTurnRow(s);
     }
 
     return Text(
@@ -68,13 +72,13 @@ class TurnIndicator extends StatelessWidget {
 
   // ── Win banner ─────────────────────────────────────────────────────────────
 
-  Widget _buildWinRow() {
+  Widget _buildWinRow(AppStrings s) {
     final winner = game.winner!;
     return Row(
       children: [
         const Text('🏆 ', style: TextStyle(fontSize: 20)),
         Text(
-          '${winner.displayName} wins!',
+          s.winsBanner(winner.displayName),
           style: const TextStyle(
             color: Color(0xFFFFD700),
             fontSize: 18,
@@ -83,7 +87,7 @@ class TurnIndicator extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          '${_formatScore(winner.currentScore)} pts',
+          s.winsScore(winner.currentScore),
           style: const TextStyle(color: Colors.white70, fontSize: 14),
         ),
       ],
@@ -92,14 +96,15 @@ class TurnIndicator extends StatelessWidget {
 
   // ── Turn score + context (displayed below the dice board) ─────────────────
 
-  Widget _buildTurnRow() {
+  Widget _buildTurnRow(AppStrings s) {
     final scoreLabel = game.phase == GamePhase.stealWindow
-        ? 'Available to steal: '
-        : 'Turn score: ';
+        ? s.availableToSteal
+        : s.turnScore;
     final score = game.phase == GamePhase.stealWindow
         ? game.pendingTheftContext?.inheritedScore
         : game.activeTurn?.temporaryScore;
     final showScore = score != null && score > 0;
+    final msg = _contextMessage(s);
 
     return Row(
       children: [
@@ -117,11 +122,12 @@ class TurnIndicator extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              if (_contextMessage != null) ...[
+              if (msg != null) ...[
                 if (showScore) const SizedBox(height: 2),
                 Text(
-                  _contextMessage!,
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  msg,
+                  style: const TextStyle(
+                      color: Color(0xFF94A3B8), fontSize: 12),
                 ),
               ],
             ],
@@ -139,25 +145,25 @@ class TurnIndicator extends StatelessWidget {
     );
   }
 
-  String? get _contextMessage {
+  String? _contextMessage(AppStrings s) {
     if (game.phase == GamePhase.stealWindow) {
       final n = game.pendingTheftContext?.availableDiceCount;
-      return n != null ? '$n dice remaining — steal or skip?' : null;
+      return n != null ? s.diceRemaining(n) : null;
     }
     final turn = game.activeTurn;
     return switch (turn?.phase) {
-      TurnPhase.awaitingSelection => _selectionMsg(turn!),
-      TurnPhase.bankingDecision => 'Roll again or bank your score',
-      TurnPhase.forcedContinue => 'Score not round — must keep rolling',
-      TurnPhase.hotDiceForced => 'All 5 scored! Roll all dice again (+200 bonus)',
+      TurnPhase.awaitingSelection => _selectionMsg(turn!, s),
+      TurnPhase.bankingDecision => s.rollAgainOrBank,
+      TurnPhase.forcedContinue => s.scoreNotRound,
+      TurnPhase.hotDiceForced => s.hotDiceForced,
       _ => null,
     };
   }
 
-  String _selectionMsg(TurnState turn) {
-    if (turn.rollHistory.isEmpty) return 'Select dice to set aside, then confirm';
+  String _selectionMsg(TurnState turn, AppStrings s) {
+    if (turn.rollHistory.isEmpty) return s.selectDice;
     final pts = turn.rollHistory.last.rollPoints;
-    return 'Roll: +$pts available — select dice, then confirm';
+    return s.rollAvailable(pts);
   }
 
   static String _formatScore(int score) {
