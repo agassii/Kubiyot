@@ -158,13 +158,20 @@ class TurnIndicator extends StatelessWidget {
       final n = game.pendingTheftContext?.availableDiceCount;
       return n != null ? '$n dice remaining — steal or skip?' : null;
     }
-    return switch (game.activeTurn?.phase) {
-      TurnPhase.awaitingSelection => 'Tap scoring dice to select, then confirm',
+    final turn = game.activeTurn;
+    return switch (turn?.phase) {
+      TurnPhase.awaitingSelection => _selectionMsg(turn!),
       TurnPhase.bankingDecision => 'Roll again or bank your score',
       TurnPhase.forcedContinue => 'Score not round — must keep rolling',
       TurnPhase.hotDiceForced => 'All 5 scored! Roll all dice again (+200 bonus)',
       _ => null,
     };
+  }
+
+  String _selectionMsg(TurnState turn) {
+    if (turn.rollHistory.isEmpty) return 'Select dice to set aside, then confirm';
+    final pts = turn.rollHistory.last.rollPoints;
+    return 'Roll: +$pts available — select dice, then confirm';
   }
 
   static String _formatScore(int score) {

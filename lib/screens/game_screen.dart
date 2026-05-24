@@ -58,7 +58,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     // Guard: don't fire during reveal (the reveal covers this roll already).
     final turn = game.activeTurn;
     if (reveal == null && actions.mustSelect && turn != null && turn.rollHistory.isNotEmpty) {
-      final key = '${turn.playerId}:${turn.rollNumber}';
+      // Key uses object identity (not just playerId) so a new turn's rollNumber=1
+      // never collides with the same player's previous turn's rollNumber=1.
+      final key = '${identityHashCode(turn)}:${turn.rollNumber}';
       if (key != _lastAutoSelectKey) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
