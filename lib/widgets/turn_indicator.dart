@@ -90,7 +90,7 @@ class TurnIndicator extends StatelessWidget {
     );
   }
 
-  // ── Normal turn info ───────────────────────────────────────────────────────
+  // ── Turn score + context (displayed below the dice board) ─────────────────
 
   Widget _buildTurnRow() {
     final scoreLabel = game.phase == GamePhase.stealWindow
@@ -99,56 +99,42 @@ class TurnIndicator extends StatelessWidget {
     final score = game.phase == GamePhase.stealWindow
         ? game.pendingTheftContext?.inheritedScore
         : game.activeTurn?.temporaryScore;
+    final showScore = score != null && score > 0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    return Row(
       children: [
-        Row(
-          children: [
-            const Text('▶ ', style: TextStyle(color: Color(0xFFFFD700), fontSize: 13)),
-            Text(
-              '${game.currentPlayer.displayName}\'s turn',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if ((game.activeTurn?.hotDiceCount ?? 0) > 0) ...[
-              const SizedBox(width: 8),
-              const Text('🔥', style: TextStyle(fontSize: 16)),
-            ],
-            const Spacer(),
-            // Persistent restart button (Bug #9)
-            if (onNewGame != null)
-              GestureDetector(
-                onTap: onNewGame,
-                child: const Padding(
-                  padding: EdgeInsets.only(left: 4),
-                  child: Icon(
-                    Icons.refresh,
-                    color: Color(0xFF4B5563),
-                    size: 18,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showScore)
+                Text(
+                  '$scoreLabel${_formatScore(score!)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-          ],
+              if (_contextMessage != null) ...[
+                if (showScore) const SizedBox(height: 2),
+                Text(
+                  _contextMessage!,
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                ),
+              ],
+            ],
+          ),
         ),
-        if (score != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            '$scoreLabel${_formatScore(score)}',
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+        if (onNewGame != null)
+          GestureDetector(
+            onTap: onNewGame,
+            child: const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: Icon(Icons.refresh, color: Color(0xFF4B5563), size: 18),
+            ),
           ),
-        ],
-        if (_contextMessage != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            _contextMessage!,
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-          ),
-        ],
       ],
     );
   }

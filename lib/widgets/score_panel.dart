@@ -16,6 +16,7 @@ class ScorePanel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (int i = 0; i < players.length; i++) ...[
             Expanded(
@@ -42,32 +43,18 @@ class _PlayerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-      decoration: BoxDecoration(
-        color: isCurrent ? const Color(0xFF1E3A5F) : const Color(0xFF16213E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isCurrent ? const Color(0xFFFFD700) : Colors.transparent,
-          width: 2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildNameRow(),
-          const SizedBox(height: 5),
-          _buildScoreSection(),
-          const SizedBox(height: 6),
-          _XMarks(count: player.consecutiveXCount),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildNameRow(),
+        const SizedBox(height: 4),
+        _buildTable(),
+      ],
     );
   }
 
-  // ── Name row ──────────────────────────────────────────────────────────────
+  // ── Name above table ──────────────────────────────────────────────────────
 
   Widget _buildNameRow() {
     return Row(
@@ -78,89 +65,98 @@ class _PlayerCard extends StatelessWidget {
           child: Text(
             player.displayName,
             style: TextStyle(
-              color: isCurrent ? Colors.white : Colors.white70,
+              color: isCurrent ? Colors.white : Colors.white54,
               fontSize: 13,
               fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
               overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
-        // Entry badge
-        if (!player.isEntered)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: const Color(0xFF374151),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Text(
-              'NEW',
-              style: TextStyle(
-                color: Color(0xFF9CA3AF),
-                fontSize: 8,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
       ],
     );
   }
 
-  // ── Score section — tier ladder with strikethrough ────────────────────────
+  // ── Tier table ────────────────────────────────────────────────────────────
 
-  Widget _buildScoreSection() {
-    final atRisk = player.consecutiveXCount == 2;
-    final current = player.currentScore;
+  Widget _buildTable() {
+    // scoreTiers: [0] = not entered; additional elements = banked tier scores.
+    // Reverse so newest (highest) tier appears at the top of the table.
+    final tiers = player.scoreTiers.reversed.where((t) => t > 0).toList();
 
-    // Color for the current (live) score.
-    final Color scoreColor;
-    if (atRisk) {
-      scoreColor = const Color(0xFFFF9F1C); // orange = one X away from tier burn
-    } else if (isCurrent) {
-      scoreColor = Colors.white;
-    } else {
-      scoreColor = Colors.white54;
-    }
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        color: const Color(0xFF16213E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isCurrent ? const Color(0xFFFFD700) : const Color(0xFF2A2A4A),
+          width: isCurrent ? 2 : 1,
+        ),
+      ),
+      child: tiers.isEmpty
+          ? _buildEmptyRow()
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < tiers.length; i++) ...[
+                  if (i > 0)
+                    const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A4A)),
+                  _buildTierRow(tiers[i], isNewestTier: i == 0),
+                ],
+              ],
+            ),
+    );
+  }
 
-    // Previous non-zero tier (the safety-net score the player would drop to).
-    final prevTier = player.scoreTiers.length >= 2
-        ? player.scoreTiers[player.scoreTiers.length - 2]
-        : null;
-    final showPrev = prevTier != null && prevTier > 0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Previous tier shown with strikethrough — visually "passed" score.
-        if (showPrev)
-          Text(
-            _fmt(prevTier!),
-            style: TextStyle(
-              color: atRisk
-                  ? const Color(0xFF9CA3AF) // grey when at risk
-                  : const Color(0xFF4B5563),
-              fontSize: 11,
-              height: 1.1,
-              decoration: TextDecoration.lineThrough,
-              decorationColor: atRisk
-                  ? const Color(0xFF9CA3AF)
-                  : const Color(0xFF4B5563),
-              decorationThickness: 1.5,
+  // Not-entered placeholder row.
+  Widget _buildEmptyRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              '—',
+              style: TextStyle(color: Colors.white24, fontSize: 18, height: 1.1),
             ),
           ),
-        // Current score
-        Text(
-          _fmt(current),
-          style: TextStyle(
-            color: scoreColor,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            height: 1.1,
+          _XMarks(count: player.consecutiveXCount),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTierRow(int score, {required bool isNewestTier}) {
+    final atRisk = isNewestTier && player.consecutiveXCount == 2;
+
+    final Color scoreColor;
+    if (atRisk) {
+      scoreColor = const Color(0xFFFF9F1C);
+    } else if (isNewestTier) {
+      scoreColor = isCurrent ? Colors.white : Colors.white70;
+    } else {
+      scoreColor = const Color(0xFF374151);
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(10, isNewestTier ? 8 : 5, 8, isNewestTier ? 8 : 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _fmt(score),
+              style: TextStyle(
+                color: scoreColor,
+                fontSize: isNewestTier ? 20 : 12,
+                fontWeight: isNewestTier ? FontWeight.bold : FontWeight.normal,
+                height: 1.1,
+              ),
+            ),
           ),
-        ),
-      ],
+          _XMarks(count: isNewestTier ? player.consecutiveXCount : 0),
+        ],
+      ),
     );
   }
 

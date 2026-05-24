@@ -92,11 +92,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               players: game.players,
               currentPlayerIndex: game.currentPlayerIndex,
             ),
-            TurnIndicator(
-              game: game,
-              rollReveal: reveal,
-              onNewGame: _newGame,
-            ),
             Expanded(
               child: DiceBoard(
                 turn: game.activeTurn,
@@ -106,6 +101,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 onDieTapped: _handleDieTap,
                 rollReveal: reveal,
               ),
+            ),
+            TurnIndicator(
+              game: game,
+              rollReveal: reveal,
+              onNewGame: _newGame,
             ),
             ActionButtons(
               actions: actions,

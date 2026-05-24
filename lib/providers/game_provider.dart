@@ -89,8 +89,8 @@ class GameNotifier extends ChangeNotifier {
       // Selection rolls: auto-dismiss after the animation settles (1300 ms).
       // Terminal / hot-dice reveals stay longer so the player can read them.
       final delay = turn.phase == TurnPhase.awaitingSelection
-          ? const Duration(milliseconds: 1300)
-          : const Duration(milliseconds: 1800);
+          ? const Duration(milliseconds: 2000)
+          : const Duration(milliseconds: 2500);
       Future.delayed(delay, () {
         if (!_isDisposed && _rollReveal != null) {
           _rollReveal = null;
