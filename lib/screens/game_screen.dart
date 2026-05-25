@@ -6,7 +6,7 @@ import '../providers/turn_provider.dart';
 import '../widgets/dice_board.dart';
 import '../widgets/help_modal.dart';
 import '../widgets/lang_toggle.dart';
-import '../widgets/score_panel.dart';
+import '../widgets/compact_score_bar.dart';
 import '../widgets/turn_indicator.dart';
 import '../widgets/action_buttons.dart';
 import 'home_screen.dart';
@@ -113,9 +113,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 ],
               ),
             ),
-            ScorePanel(
+            CompactScoreBar(
               players: game.players,
               currentPlayerIndex: game.currentPlayerIndex,
+            ),
+            TurnIndicator(
+              game: game,
+              rollReveal: reveal,
+              onNewGame: _newGame,
             ),
             Expanded(
               child: DiceBoard(
@@ -126,11 +131,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 onDieTapped: _handleDieTap,
                 rollReveal: reveal,
               ),
-            ),
-            TurnIndicator(
-              game: game,
-              rollReveal: reveal,
-              onNewGame: _newGame,
             ),
             ActionButtons(
               actions: actions,
