@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'l10n/app_strings.dart';
 import 'providers/game_provider.dart';
 import 'providers/language_provider.dart';
@@ -10,6 +12,18 @@ import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
+
+  // Strip any path suffix — supabase_flutter needs just scheme://host
+  final rawUrl = dotenv.env['SUPABASE_URL'] ?? '';
+  final parsedUri = Uri.parse(rawUrl);
+  final supabaseUrl = parsedUri.hasScheme
+      ? '${parsedUri.scheme}://${parsedUri.host}'
+      : rawUrl;
+  final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+
   await Hive.initFlutter();
   await Hive.openBox('settings');
   final hiveService = HiveService();

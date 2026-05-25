@@ -6,6 +6,7 @@ import '../engine/turn_state_machine.dart';
 import '../models/roll_reveal.dart';
 import '../providers/game_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/multiplayer_provider.dart';
 import '../providers/turn_provider.dart';
 import '../widgets/dice_board.dart';
 import '../widgets/help_modal.dart';
@@ -93,6 +94,16 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     }
 
     final isAiTurn = notifier.isCurrentPlayerAi;
+    final mpState = ref.watch(multiplayerProvider);
+    final isMultiplayer = mpState.phase == MultiplayerPhase.inGame;
+    final isMyTurn = !isAiTurn &&
+        (!isMultiplayer || mpState.isLocalPlayerTurn(game.currentPlayerIndex));
+
+    void pushIfMultiplayer() {
+      if (isMultiplayer) {
+        ref.read(multiplayerProvider.notifier).pushState();
+      }
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
@@ -127,6 +138,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               child: CompactScoreBar(
                 players: game.players,
                 currentPlayerIndex: game.currentPlayerIndex,
+                disconnectedPlayerIndices:
+                    isMultiplayer ? mpState.disconnectedSeatIndices : null,
               ),
             ),
             SizedBox(
@@ -137,7 +150,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 onNewGame: _newGame,
               ),
             ),
-            // Thinking indicator shown while AI is computing.
+            // Thinking / turn status indicator
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: _aiThinking
@@ -153,7 +166,25 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                         ),
                       ),
                     )
-                  : const SizedBox.shrink(key: ValueKey('idle')),
+                  : isMultiplayer && !game.isComplete
+                      ? Padding(
+                          key: ValueKey('mp_$isMyTurn'),
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Text(
+                            isMyTurn ? s.yourTurn : s.opponentTurn,
+                            style: TextStyle(
+                              color: isMyTurn
+                                  ? const Color(0xFF06D6A0)
+                                  : const Color(0xFF94A3B8),
+                              fontSize: 12,
+                              fontWeight: isMyTurn
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(key: ValueKey('idle')),
             ),
             Expanded(
               child: DiceBoard(
@@ -175,12 +206,31 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               actions: actions,
               hasSelection: _selectedIndices.isNotEmpty,
               isGameOver: game.isComplete,
-              // Disable all interactive buttons during the AI's turn.
-              onRoll: isAiTurn ? null : () => ref.read(gameProvider).rollDice(),
-              onBank: isAiTurn ? null : () => ref.read(gameProvider).bank(),
-              onConfirm: isAiTurn ? null : _confirmSelection,
-              onSteal: isAiTurn ? null : () => ref.read(gameProvider).decideTheft(true),
-              onSkip: isAiTurn ? null : () => ref.read(gameProvider).decideTheft(false),
+              onRoll: isMyTurn
+                  ? () {
+                      ref.read(gameProvider).rollDice();
+                      pushIfMultiplayer();
+                    }
+                  : null,
+              onBank: isMyTurn
+                  ? () {
+                      ref.read(gameProvider).bank();
+                      pushIfMultiplayer();
+                    }
+                  : null,
+              onConfirm: isMyTurn ? _confirmSelection : null,
+              onSteal: isMyTurn
+                  ? () {
+                      ref.read(gameProvider).decideTheft(true);
+                      pushIfMultiplayer();
+                    }
+                  : null,
+              onSkip: isMyTurn
+                  ? () {
+                      ref.read(gameProvider).decideTheft(false);
+                      pushIfMultiplayer();
+                    }
+                  : null,
               onNewGame: _newGame,
               onDismissReveal: () => ref.read(gameProvider).dismissRollReveal(),
             ),
@@ -282,6 +332,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (_selectedIndices.isEmpty) return;
     ref.read(gameProvider).selectDice(_selectedIndices.toList());
     setState(() => _selectedIndices.clear());
+    final mpState = ref.read(multiplayerProvider);
+    if (mpState.phase == MultiplayerPhase.inGame) {
+      ref.read(multiplayerProvider.notifier).pushState();
+    }
   }
 
   void _newGame() {
@@ -292,6 +346,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       _aiThinking = false;
     });
     ref.read(gameProvider).dismissRollReveal();
+    ref.read(multiplayerProvider.notifier).leave();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
     );

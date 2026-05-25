@@ -140,6 +140,67 @@ class GameNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Multiplayer helpers ───────────────────────────────────────────────────
+
+  void loadStateFromRemote(GameState state) {
+    _state = state;
+    _rollReveal = null;
+    notifyListeners();
+  }
+
+  void forceAdvanceTurn() {
+    if (_state == null || _state!.isComplete) return;
+    final startIndex = _state!.currentPlayerIndex;
+    int safety = 0;
+    while (!_state!.isComplete &&
+        _state!.currentPlayerIndex == startIndex &&
+        safety < 10) {
+      safety++;
+      _forceOneStep();
+    }
+    _save();
+    notifyListeners();
+  }
+
+  void _forceOneStep() {
+    if (_state!.phase == GamePhase.stealWindow) {
+      _state = _manager.processTheftDecision(game: _state!, steal: false);
+      return;
+    }
+    final turn = _state!.activeTurn;
+    if (turn == null) return;
+    switch (turn.phase) {
+      case TurnPhase.awaitingSelection:
+        final indices =
+            turn.rollHistory.last.scoringDice.map((d) => d.index).toList();
+        if (indices.isNotEmpty) {
+          _state = _manager.processSelection(
+              game: _state!, selectedDiceIndices: indices);
+        } else {
+          _forceRollFarkle(turn);
+        }
+      case TurnPhase.bankingDecision:
+        if (_manager.canCurrentPlayerBank(_state!)) {
+          _state = _manager.processBank(_state!);
+        } else {
+          _forceRollFarkle(turn);
+        }
+      case TurnPhase.waitingToRoll:
+      case TurnPhase.forcedContinue:
+      case TurnPhase.hotDiceForced:
+        _forceRollFarkle(turn);
+      case TurnPhase.turnComplete:
+        break;
+    }
+  }
+
+  void _forceRollFarkle(TurnState turn) {
+    final n = turn.availableDiceCount;
+    const nonScoring = [2, 3, 4, 6];
+    final faces = List.generate(n, (i) => nonScoring[i % 4]);
+    _state = _manager.processRoll(game: _state!, rolledFaces: faces);
+  }
+
   // ── Persistence ───────────────────────────────────────────────────────────
 
   void _save() {

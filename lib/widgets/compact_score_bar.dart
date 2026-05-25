@@ -5,11 +5,13 @@ import 'score_panel.dart';
 class CompactScoreBar extends StatelessWidget {
   final List<Player> players;
   final int currentPlayerIndex;
+  final Set<int>? disconnectedPlayerIndices;
 
   const CompactScoreBar({
     super.key,
     required this.players,
     required this.currentPlayerIndex,
+    this.disconnectedPlayerIndices,
   });
 
   @override
@@ -26,6 +28,8 @@ class CompactScoreBar extends StatelessWidget {
                 child: _PlayerChip(
                   player: players[i],
                   isCurrent: i == currentPlayerIndex,
+                  isDisconnected:
+                      disconnectedPlayerIndices?.contains(i) ?? false,
                 ),
               ),
               if (i < players.length - 1) const SizedBox(width: 6),
@@ -56,8 +60,13 @@ class CompactScoreBar extends StatelessWidget {
 class _PlayerChip extends StatelessWidget {
   final Player player;
   final bool isCurrent;
+  final bool isDisconnected;
 
-  const _PlayerChip({required this.player, required this.isCurrent});
+  const _PlayerChip({
+    required this.player,
+    required this.isCurrent,
+    this.isDisconnected = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +96,8 @@ class _PlayerChip extends StatelessWidget {
     return Row(
       children: [
         if (isCurrent)
-          const Text('★ ', style: TextStyle(color: Color(0xFFFFD700), fontSize: 10)),
+          const Text('★ ',
+              style: TextStyle(color: Color(0xFFFFD700), fontSize: 10)),
         Expanded(
           child: Text(
             player.displayName,
@@ -99,6 +109,16 @@ class _PlayerChip extends StatelessWidget {
             ),
           ),
         ),
+        if (isDisconnected)
+          Container(
+            width: 6,
+            height: 6,
+            margin: const EdgeInsets.only(left: 3),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFFEF4444),
+            ),
+          ),
       ],
     );
   }

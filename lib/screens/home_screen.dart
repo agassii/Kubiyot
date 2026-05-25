@@ -7,9 +7,10 @@ import '../providers/language_provider.dart';
 import '../widgets/help_modal.dart';
 import '../widgets/lang_toggle.dart';
 import 'game_screen.dart';
+import 'join_game_screen.dart';
 
 // Game mode enum
-enum _GameMode { local, computer }
+enum _GameMode { local, computer, online }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -86,6 +87,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _startGame() {
     final s = ref.read(stringsProvider);
+
+    if (_mode == _GameMode.online) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const JoinGameScreen()),
+      );
+      return;
+    }
 
     if (_mode == _GameMode.computer) {
       final humanName = _humanNameCtrl.text.trim().isEmpty
@@ -217,14 +225,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 8),
               _ModeRow(
                 label: s.modeOnline,
-                isSelected: false,
-                comingSoon: true,
-                comingSoonLabel: s.comingSoon,
+                isSelected: _mode == _GameMode.online,
+                onTap: () => setState(() => _mode = _GameMode.online),
               ),
               const SizedBox(height: 28),
 
               // ── Mode-specific setup ──────────────────────────────────────
-              if (_mode == _GameMode.local) ...[
+              if (_mode == _GameMode.online) ...[
+                const SizedBox(height: 8),
+              ] else if (_mode == _GameMode.local) ...[
                 _sectionLabel(s.numPlayers),
                 const SizedBox(height: 10),
                 Row(
@@ -300,7 +309,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                   child: Text(
-                    s.startGame,
+                    _mode == _GameMode.online ? s.playOnline : s.startGame,
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.bold),
                   ),
@@ -589,23 +598,18 @@ class _NameField extends StatelessWidget {
 class _ModeRow extends StatelessWidget {
   final String label;
   final bool isSelected;
-  final bool comingSoon;
-  final String comingSoonLabel;
   final VoidCallback? onTap;
 
   const _ModeRow({
-    super.key,
     required this.label,
     required this.isSelected,
-    this.comingSoon = false,
-    this.comingSoonLabel = 'Coming Soon',
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: comingSoon ? null : onTap,
+      onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -647,29 +651,9 @@ class _ModeRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
-                  color: comingSoon ? const Color(0xFF4B5563) : Colors.white,
-                  fontSize: 15,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 15),
               ),
             ),
-            if (comingSoon)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A4A),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  comingSoonLabel,
-                  style: const TextStyle(
-                    color: Color(0xFF4B5563),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
           ],
         ),
       ),

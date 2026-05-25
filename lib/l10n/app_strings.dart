@@ -27,6 +27,34 @@ class AppStrings {
   String get aiThinking => isHebrew ? 'חושב...' : 'Thinking...';
   String get yourName => isHebrew ? 'השם שלך' : 'Your Name';
   String get startGame => isHebrew ? 'התחל משחק' : 'Start Game';
+
+  // ── Online multiplayer ────────────────────────────────────────────────────
+  String get playOnline => isHebrew ? 'משחק אונליין' : 'Play Online';
+  String get createRoom => isHebrew ? 'צור חדר' : 'Create Room';
+  String get joinRoom => isHebrew ? 'הצטרף לחדר' : 'Join Room';
+  String get enterRoomCode =>
+      isHebrew ? 'הכנס קוד חדר (XXXX-1234)' : 'Enter room code (XXXX-1234)';
+  String get roomCode => isHebrew ? 'קוד חדר' : 'Room Code';
+  String get waitingForPlayers =>
+      isHebrew ? 'ממתין לשחקנים...' : 'Waiting for players...';
+  String get waitingForHost =>
+      isHebrew ? 'ממתין למארח להתחיל...' : 'Waiting for host to start...';
+  String get startOnlineGame =>
+      isHebrew ? 'התחל משחק' : 'Start Game';
+  String get copyCode => isHebrew ? 'העתק קוד' : 'Copy Code';
+  String get codeCopied => isHebrew ? 'קוד הועתק!' : 'Code copied!';
+  String get yourTurn => isHebrew ? '🎲 התור שלך!' : '🎲 Your Turn!';
+  String get opponentTurn => isHebrew ? 'תור היריב' : "Opponent's turn";
+  String get connected => isHebrew ? 'מחובר' : 'Connected';
+  String get disconnected => isHebrew ? 'מנותק' : 'Disconnected';
+  String get connecting => isHebrew ? 'מתחבר...' : 'Connecting...';
+  String get leaveGame => isHebrew ? 'עזוב משחק' : 'Leave Game';
+  String get shareCode =>
+      isHebrew ? 'שתף את הקוד עם חברים' : 'Share this code with friends';
+  String playersInRoom(int n) =>
+      isHebrew ? '$n שחקנים בחדר' : '$n player${n == 1 ? '' : 's'} in room';
+  String get minPlayersNeeded =>
+      isHebrew ? 'דרושים לפחות 2 שחקנים' : 'Need at least 2 players';
   String get savedGame => isHebrew ? 'משחק שמור' : 'Saved Game';
   String get continueGame => isHebrew ? 'המשך משחק' : 'Continue Game';
   String get vsSeparator => isHebrew ? ' נגד ' : ' vs ';
