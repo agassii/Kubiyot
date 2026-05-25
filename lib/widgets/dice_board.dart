@@ -27,6 +27,7 @@ class DiceBoard extends ConsumerWidget {
   final Set<int> selectedIndices;
   final void Function(int index) onDieTapped;
   final RollReveal? rollReveal;
+  final String? previousPlayerName; // for "Inherited from X" label in steal window
 
   const DiceBoard({
     super.key,
@@ -36,6 +37,7 @@ class DiceBoard extends ConsumerWidget {
     required this.selectedIndices,
     required this.onDieTapped,
     this.rollReveal,
+    this.previousPlayerName,
   });
 
   @override
@@ -44,25 +46,30 @@ class DiceBoard extends ConsumerWidget {
     final zone1 = _computeZone1();
     final zone2 = _computeZone2();
 
+    final isStealWindow = gamePhase == GamePhase.stealWindow && rollReveal == null;
+    final zone1Label = isStealWindow
+        ? s.inheritedFrom(previousPlayerName ?? '')
+        : s.locked;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (gamePhase == GamePhase.stealWindow && rollReveal == null) ...[
-            Text(
-              s.diceToSteal,
-              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-          ],
           if (zone1.isNotEmpty) ...[
-            _buildZoneLabel(s.locked, const Color(0xFFFFD700)),
+            _buildZoneLabel(zone1Label, const Color(0xFFFFD700)),
             const SizedBox(height: 6),
             _buildDiceRow(zone1, selectable: false),
             const SizedBox(height: 18),
             const Divider(color: Color(0xFF2A2A4A), height: 1),
             const SizedBox(height: 14),
+          ],
+          if (isStealWindow && zone2.isNotEmpty) ...[
+            _buildZoneLabel(
+              s.yourDice(zone2.length),
+              const Color(0xFF94A3B8),
+            ),
+            const SizedBox(height: 6),
           ],
           _buildDiceRow(zone2, selectable: true),
         ],
@@ -73,6 +80,18 @@ class DiceBoard extends ConsumerWidget {
   // ── Zone 1: locked set-aside dice ─────────────────────────────────────────
 
   List<_DieData> _computeZone1() {
+    // During steal window: show the dice Player A set aside (from inheritedTriples).
+    if (gamePhase == GamePhase.stealWindow && rollReveal == null) {
+      final triples = theftContext?.inheritedTriples ?? {};
+      final dice = <_DieData>[];
+      int idx = 0;
+      for (final entry in triples.entries) {
+        for (int i = 0; i < 3 * entry.value; i++) {
+          dice.add(_DieData(idx++, entry.key.value, _DieStatus.setAside));
+        }
+      }
+      return dice;
+    }
     final source = rollReveal != null ? rollReveal!.setAsideDice : (turn?.setAsideDice ?? []);
     final skip = rollReveal != null
         ? rollReveal!.sentinelCount

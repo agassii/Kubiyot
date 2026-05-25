@@ -338,8 +338,8 @@ void main() {
         consecutiveXCount: 1,
         isEntered: true,
         tierHistory: [
-          const TierRecord(score: 400, xCount: 1),
-          const TierRecord(score: 900, xCount: 3, burned: true),
+          TierRecord(score: 400, xCount: 1),
+          TierRecord(score: 900, xCount: 3, burned: true),
         ],
       );
       final game = GameState(

@@ -70,6 +70,10 @@ class AppStrings {
   // ── Dice board ───────────────────────────────────────────────────────────────
   String get diceToSteal => isHebrew ? 'קוביות לגניבה' : 'Dice available to steal';
   String get locked => isHebrew ? 'נעול' : 'LOCKED';
+  String inheritedFrom(String name) =>
+      isHebrew ? 'עובר מ-$name' : 'Inherited from $name';
+  String yourDice(int n) =>
+      isHebrew ? 'הקוביות שלך ($n נותרו)' : 'Your dice ($n remaining)';
 
   // ── Help modal ───────────────────────────────────────────────────────────────
   String get helpTitle => isHebrew ? 'ספר החוקים' : 'Rulebook';

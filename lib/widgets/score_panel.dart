@@ -79,8 +79,19 @@ class _PlayerCard extends StatelessWidget {
   // ── Tier table ────────────────────────────────────────────────────────────
 
   Widget _buildTable() {
-    final currentScore = player.currentScore;
-    final history = player.tierHistory.reversed.toList();
+    final history = player.tierHistory;
+
+    // Current tier = last non-burned entry.
+    int activeIdx = -1;
+    for (int i = history.length - 1; i >= 0; i--) {
+      if (!history[i].burned) { activeIdx = i; break; }
+    }
+
+    // Past entries = everything except activeIdx, in reverse-chronological order.
+    final pastEntries = <TierRecord>[];
+    for (int i = history.length - 1; i >= 0; i--) {
+      if (i != activeIdx) pastEntries.add(history[i]);
+    }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -96,8 +107,10 @@ class _PlayerCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          currentScore > 0 ? _buildCurrentTierRow(currentScore) : _buildEmptyRow(),
-          for (final record in history) ...[
+          activeIdx >= 0
+              ? _buildCurrentTierRow(history[activeIdx])
+              : _buildEmptyRow(),
+          for (final record in pastEntries) ...[
             const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A4A)),
             _buildHistoryTierRow(record),
           ],
@@ -106,7 +119,8 @@ class _PlayerCard extends StatelessWidget {
     );
   }
 
-  // Not-entered placeholder row (also used when player is burned back to 0).
+  // Placeholder row for players who have never banked (or burned back to 0
+  // with no active entry).
   Widget _buildEmptyRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
@@ -124,7 +138,9 @@ class _PlayerCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCurrentTierRow(int score) {
+  // Current active tier — uses TierRecord.xCount (accumulated history),
+  // but at-risk coloring uses consecutiveXCount (the engine's danger indicator).
+  Widget _buildCurrentTierRow(TierRecord record) {
     final atRisk = player.consecutiveXCount == 2;
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
@@ -132,7 +148,7 @@ class _PlayerCard extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              _fmt(score),
+              _fmt(record.score),
               style: TextStyle(
                 color: atRisk
                     ? const Color(0xFFFF9F1C)
@@ -143,7 +159,7 @@ class _PlayerCard extends StatelessWidget {
               ),
             ),
           ),
-          _XMarks(count: player.consecutiveXCount),
+          _XMarks(count: record.xCount),
         ],
       ),
     );

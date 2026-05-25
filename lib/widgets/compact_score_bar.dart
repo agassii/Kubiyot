@@ -17,22 +17,20 @@ class CompactScoreBar extends StatelessWidget {
     return GestureDetector(
       onTap: () => _showTierHistory(context),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (int i = 0; i < players.length; i++) ...[
-                Expanded(
-                  child: _PlayerChip(
-                    player: players[i],
-                    isCurrent: i == currentPlayerIndex,
-                  ),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (int i = 0; i < players.length; i++) ...[
+              Expanded(
+                child: _PlayerChip(
+                  player: players[i],
+                  isCurrent: i == currentPlayerIndex,
                 ),
-                if (i < players.length - 1) const SizedBox(width: 6),
-              ],
+              ),
+              if (i < players.length - 1) const SizedBox(width: 6),
             ],
-          ),
+          ],
         ),
       ),
     );

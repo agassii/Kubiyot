@@ -113,14 +113,20 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 ],
               ),
             ),
-            CompactScoreBar(
-              players: game.players,
-              currentPlayerIndex: game.currentPlayerIndex,
+            SizedBox(
+              height: 80,
+              child: CompactScoreBar(
+                players: game.players,
+                currentPlayerIndex: game.currentPlayerIndex,
+              ),
             ),
-            TurnIndicator(
-              game: game,
-              rollReveal: reveal,
-              onNewGame: _newGame,
+            SizedBox(
+              height: 48,
+              child: TurnIndicator(
+                game: game,
+                rollReveal: reveal,
+                onNewGame: _newGame,
+              ),
             ),
             Expanded(
               child: DiceBoard(
@@ -130,6 +136,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 selectedIndices: _selectedIndices,
                 onDieTapped: _handleDieTap,
                 rollReveal: reveal,
+                previousPlayerName: game.phase == GamePhase.stealWindow
+                    ? game.players[
+                            (game.currentPlayerIndex - 1 + game.players.length) %
+                                game.players.length]
+                        .displayName
+                    : null,
               ),
             ),
             ActionButtons(

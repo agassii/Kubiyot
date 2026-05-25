@@ -20,14 +20,10 @@
 
 class TierRecord {
   final int score;
-  final int xCount;  // X marks accumulated while this tier was active (0-3)
-  final bool burned; // true = lost to 3-X rule (shows ●●● + strikethrough)
+  int xCount;  // total X marks accumulated on this tier (increments in-place)
+  bool burned; // true = tier was lost (3-X rule or stomp) — shows strikethrough
 
-  const TierRecord({
-    required this.score,
-    required this.xCount,
-    this.burned = false,
-  });
+  TierRecord({required this.score, this.xCount = 0, this.burned = false});
 }
 
 // -----------------------------------------------------------------------------
@@ -165,13 +161,8 @@ class PlayerManager {
 
     // Win condition.
     if (newScore == 10000) {
-      if (scoreBefore > 0) {
-        bankingPlayer.tierHistory.add(TierRecord(
-          score: scoreBefore,
-          xCount: bankingPlayer.consecutiveXCount,
-        ));
-      }
       bankingPlayer.scoreTiers.add(newScore);
+      bankingPlayer.tierHistory.add(TierRecord(score: newScore));
       bankingPlayer.consecutiveXCount = 0;
       _markEntered(bankingPlayer);
 
@@ -189,14 +180,9 @@ class PlayerManager {
       );
     }
 
-    // Normal bank.
-    if (scoreBefore > 0) {
-      bankingPlayer.tierHistory.add(TierRecord(
-        score: scoreBefore,
-        xCount: bankingPlayer.consecutiveXCount,
-      ));
-    }
+    // Normal bank: create a new tier record for the incoming score.
     bankingPlayer.scoreTiers.add(newScore);
+    bankingPlayer.tierHistory.add(TierRecord(score: newScore));
     bankingPlayer.consecutiveXCount = 0;
     _markEntered(bankingPlayer);
 
@@ -239,14 +225,14 @@ class PlayerManager {
 
     final events = <PlayerEvent>[];
 
+    // Update the current tier's display record on every X.
+    final activeIdx = _lastActiveTierIdx(player.tierHistory);
+
     // 3-X Rule: third consecutive X burns the current tier.
     if (player.consecutiveXCount >= 3) {
-      if (scoreBefore > 0) {
-        player.tierHistory.add(TierRecord(
-          score: scoreBefore,
-          xCount: 3,
-          burned: true,
-        ));
+      if (activeIdx >= 0) {
+        player.tierHistory[activeIdx].xCount = 3;
+        player.tierHistory[activeIdx].burned = true;
       }
       player.consecutiveXCount = 0;
 
@@ -270,7 +256,10 @@ class PlayerManager {
       );
       events.addAll(cascadeEvents);
     } else {
-      // Just an X — no tier change.
+      // Just an X — increment current tier's display count.
+      if (activeIdx >= 0) {
+        player.tierHistory[activeIdx].xCount++;
+      }
       events.add(PlayerEvent(
         playerId: player.id,
         type: PlayerEventType.xRecorded,
@@ -326,6 +315,11 @@ class PlayerManager {
         processedPlayerIds.add(victim.id);
 
         final scoreBefore = victim.currentScore;
+        // Mark the current tier as burned in display history before removing it.
+        final activeIdx = _lastActiveTierIdx(victim.tierHistory);
+        if (activeIdx >= 0) {
+          victim.tierHistory[activeIdx].burned = true;
+        }
         final scoreAfter = _burnCurrentTier(victim);
         victim.consecutiveXCount = 0; // stomp resets X count
 
@@ -386,6 +380,14 @@ class PlayerManager {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  /// Returns the index of the last non-burned TierRecord, or -1 if none.
+  static int _lastActiveTierIdx(List<TierRecord> history) {
+    for (int i = history.length - 1; i >= 0; i--) {
+      if (!history[i].burned) return i;
+    }
+    return -1;
+  }
 
   /// Pops the last score tier, dropping the player to their previous tier.
   /// If only one tier exists (score = 0), stays at 0.
