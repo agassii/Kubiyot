@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_strings.dart';
+import '../engine/ai_player.dart';
 import '../providers/game_provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/help_modal.dart';
 import '../widgets/lang_toggle.dart';
 import 'game_screen.dart';
+
+// Game mode enum
+enum _GameMode { local, computer }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -15,12 +19,21 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  _GameMode _mode = _GameMode.local;
+
+  // ── Local mode state ───────────────────────────────────────────────────────
   int _playerCount = 2;
   final List<TextEditingController> _controllers = [];
+
+  // ── Computer mode state ────────────────────────────────────────────────────
+  int _aiCount = 1;
+  List<AiDifficulty> _aiDifficulties = [AiDifficulty.medium];
+  late final TextEditingController _humanNameCtrl;
 
   @override
   void initState() {
     super.initState();
+    _humanNameCtrl = TextEditingController(text: 'Player 1');
     for (int i = 0; i < _playerCount; i++) {
       _controllers.add(TextEditingController(text: 'Player ${i + 1}'));
     }
@@ -28,6 +41,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _humanNameCtrl.dispose();
     for (final c in _controllers) {
       c.dispose();
     }
@@ -51,6 +65,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  void _setAiCount(int count) {
+    setState(() {
+      if (count > _aiDifficulties.length) {
+        while (_aiDifficulties.length < count) {
+          _aiDifficulties.add(AiDifficulty.medium);
+        }
+      } else {
+        _aiDifficulties = _aiDifficulties.sublist(0, count);
+      }
+      _aiCount = count;
+    });
+  }
+
   void _continueSavedGame() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const GameScreen()),
@@ -59,13 +86,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _startGame() {
     final s = ref.read(stringsProvider);
-    final names = [
-      for (int i = 0; i < _controllers.length; i++)
-        _controllers[i].text.trim().isEmpty
-            ? s.playerDefault(i + 1)
-            : _controllers[i].text.trim(),
-    ];
-    ref.read(gameProvider).createGame(names);
+
+    if (_mode == _GameMode.computer) {
+      final humanName = _humanNameCtrl.text.trim().isEmpty
+          ? s.playerDefault(1)
+          : _humanNameCtrl.text.trim();
+      final names = <String>[humanName];
+      final aiConfig = <int, AiDifficulty>{};
+      for (int i = 0; i < _aiCount; i++) {
+        names.add(s.aiPlayerLabel(i + 2));
+        aiConfig[i + 1] = _aiDifficulties[i];
+      }
+      ref.read(gameProvider).createGame(names, aiConfig: aiConfig);
+    } else {
+      final names = [
+        for (int i = 0; i < _controllers.length; i++)
+          _controllers[i].text.trim().isEmpty
+              ? s.playerDefault(i + 1)
+              : _controllers[i].text.trim(),
+      ];
+      ref.read(gameProvider).createGame(names);
+    }
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const GameScreen()),
     );
@@ -85,7 +127,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Top bar: help + language toggle ────────────────────────
+              // ── Top bar ─────────────────────────────────────────────────
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -103,7 +145,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── Title ───────────────────────────────────────────────────
+              // ── Title ────────────────────────────────────────────────────
               Center(
                 child: Column(
                   children: [
@@ -128,7 +170,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 32),
 
-              // ── Saved game banner ───────────────────────────────────────
+              // ── Saved game banner ────────────────────────────────────────
               if (hasSavedGame) ...[
                 _SavedGameBanner(
                   game: savedGame!,
@@ -158,45 +200,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ] else
                 const SizedBox(height: 8),
 
-              // ── Player count ────────────────────────────────────────────
-              _sectionLabel(s.numPlayers),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  for (final n in [2, 3, 4, 5, 6]) ...[
-                    _CountChip(
-                      count: n,
-                      isSelected: _playerCount == n,
-                      onTap: () => _setPlayerCount(n),
-                    ),
-                    if (n < 6) const SizedBox(width: 8),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 28),
-
-              // ── Player names ────────────────────────────────────────────
-              _sectionLabel(s.playerNames),
-              const SizedBox(height: 10),
-              for (int i = 0; i < _playerCount; i++) ...[
-                _NameField(
-                  controller: _controllers[i],
-                  label: s.playerLabel(i + 1),
-                ),
-                if (i < _playerCount - 1) const SizedBox(height: 8),
-              ],
-              const SizedBox(height: 28),
-
-              // ── Game mode ───────────────────────────────────────────────
+              // ── Game mode ────────────────────────────────────────────────
               _sectionLabel(s.gameMode),
               const SizedBox(height: 10),
-              _ModeRow(label: s.modeLocal, isSelected: true),
+              _ModeRow(
+                label: s.modeLocal,
+                isSelected: _mode == _GameMode.local,
+                onTap: () => setState(() => _mode = _GameMode.local),
+              ),
               const SizedBox(height: 8),
               _ModeRow(
                 label: s.modeComputer,
-                isSelected: false,
-                comingSoon: true,
-                comingSoonLabel: s.comingSoon,
+                isSelected: _mode == _GameMode.computer,
+                onTap: () => setState(() => _mode = _GameMode.computer),
               ),
               const SizedBox(height: 8),
               _ModeRow(
@@ -205,9 +221,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 comingSoon: true,
                 comingSoonLabel: s.comingSoon,
               ),
+              const SizedBox(height: 28),
+
+              // ── Mode-specific setup ──────────────────────────────────────
+              if (_mode == _GameMode.local) ...[
+                _sectionLabel(s.numPlayers),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    for (final n in [2, 3, 4, 5, 6]) ...[
+                      _CountChip(
+                        count: n,
+                        isSelected: _playerCount == n,
+                        onTap: () => _setPlayerCount(n),
+                      ),
+                      if (n < 6) const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 28),
+                _sectionLabel(s.playerNames),
+                const SizedBox(height: 10),
+                for (int i = 0; i < _playerCount; i++) ...[
+                  _NameField(
+                    controller: _controllers[i],
+                    label: s.playerLabel(i + 1),
+                  ),
+                  if (i < _playerCount - 1) const SizedBox(height: 8),
+                ],
+              ] else ...[
+                // ── vs Computer setup ──────────────────────────────────────
+                _sectionLabel(s.yourName),
+                const SizedBox(height: 10),
+                _NameField(
+                  controller: _humanNameCtrl,
+                  label: s.playerLabel(1),
+                ),
+                const SizedBox(height: 28),
+                _sectionLabel(s.aiOpponents),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    for (final n in [1, 2, 3]) ...[
+                      _CountChip(
+                        count: n,
+                        isSelected: _aiCount == n,
+                        onTap: () => _setAiCount(n),
+                      ),
+                      if (n < 3) const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 20),
+                for (int i = 0; i < _aiCount; i++) ...[
+                  _AiDifficultyRow(
+                    label: s.aiPlayerLabel(i + 2),
+                    difficulty: _aiDifficulties[i],
+                    s: s,
+                    onChanged: (d) => setState(() => _aiDifficulties[i] = d),
+                  ),
+                  if (i < _aiCount - 1) const SizedBox(height: 10),
+                ],
+              ],
               const SizedBox(height: 44),
 
-              // ── Start button ────────────────────────────────────────────
+              // ── Start button ─────────────────────────────────────────────
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -243,6 +321,97 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 1.2,
+      ),
+    );
+  }
+}
+
+// ── AI difficulty row ─────────────────────────────────────────────────────────
+
+class _AiDifficultyRow extends StatelessWidget {
+  final String label;
+  final AiDifficulty difficulty;
+  final AppStrings s;
+  final ValueChanged<AiDifficulty> onChanged;
+
+  const _AiDifficultyRow({
+    required this.label,
+    required this.difficulty,
+    required this.s,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16213E),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF2A2A4A)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+          const Spacer(),
+          for (final d in AiDifficulty.values) ...[
+            _DiffChip(
+              label: _diffLabel(d),
+              isSelected: difficulty == d,
+              onTap: () => onChanged(d),
+            ),
+            if (d != AiDifficulty.values.last) const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _diffLabel(AiDifficulty d) {
+    return switch (d) {
+      AiDifficulty.easy => s.aiDiffEasy,
+      AiDifficulty.medium => s.aiDiffMedium,
+      AiDifficulty.hard => s.aiDiffHard,
+    };
+  }
+}
+
+class _DiffChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _DiffChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF3A86FF) : const Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF3A86FF) : const Color(0xFF3A3A5A),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white54,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }

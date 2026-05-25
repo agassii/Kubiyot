@@ -18,6 +18,14 @@ class AppStrings {
   String get modeComputer => isHebrew ? 'נגד מחשב' : 'vs Computer';
   String get modeOnline => isHebrew ? 'רשת — מרובה שחקנים' : 'Online Multiplayer';
   String get comingSoon => isHebrew ? 'בקרוב' : 'Coming Soon';
+  String get aiOpponents => isHebrew ? 'יריבי מחשב' : 'AI Opponents';
+  String get aiLabel => isHebrew ? 'מחשב' : 'AI';
+  String aiPlayerLabel(int n) => isHebrew ? 'מחשב $n' : 'AI $n';
+  String get aiDiffEasy => isHebrew ? 'קל' : 'Easy';
+  String get aiDiffMedium => isHebrew ? 'בינוני' : 'Medium';
+  String get aiDiffHard => isHebrew ? 'קשה' : 'Hard';
+  String get aiThinking => isHebrew ? 'חושב...' : 'Thinking...';
+  String get yourName => isHebrew ? 'השם שלך' : 'Your Name';
   String get startGame => isHebrew ? 'התחל משחק' : 'Start Game';
   String get savedGame => isHebrew ? 'משחק שמור' : 'Saved Game';
   String get continueGame => isHebrew ? 'המשך משחק' : 'Continue Game';

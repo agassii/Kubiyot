@@ -7,11 +7,11 @@ class ActionButtons extends ConsumerWidget {
   final TurnActions actions;
   final bool hasSelection;
   final bool isGameOver;
-  final VoidCallback onRoll;
-  final VoidCallback onBank;
-  final VoidCallback onConfirm;
-  final VoidCallback onSteal;
-  final VoidCallback onSkip;
+  final VoidCallback? onRoll;
+  final VoidCallback? onBank;
+  final VoidCallback? onConfirm;
+  final VoidCallback? onSteal;
+  final VoidCallback? onSkip;
   final VoidCallback onNewGame;
   final VoidCallback onDismissReveal;
 
@@ -20,11 +20,11 @@ class ActionButtons extends ConsumerWidget {
     required this.actions,
     required this.hasSelection,
     required this.isGameOver,
-    required this.onRoll,
-    required this.onBank,
-    required this.onConfirm,
-    required this.onSteal,
-    required this.onSkip,
+    this.onRoll,
+    this.onBank,
+    this.onConfirm,
+    this.onSteal,
+    this.onSkip,
     required this.onNewGame,
     required this.onDismissReveal,
   });

@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/game_manager.dart';
+import '../engine/ai_player.dart';
 import '../engine/scoring_calculator.dart';
 import '../engine/turn_state_machine.dart';
 import '../models/roll_reveal.dart';
@@ -13,6 +14,9 @@ class GameNotifier extends ChangeNotifier {
   final HiveService? _hive;
   GameState? _state;
   bool _isDisposed = false;
+
+  // AI config: player index → difficulty. Empty = all human.
+  Map<int, AiDifficulty> _aiConfig = {};
 
   RollReveal? _rollReveal;
   RollReveal? get rollReveal => _rollReveal;
@@ -34,7 +38,9 @@ class GameNotifier extends ChangeNotifier {
   void createGame(
     List<String> playerNames, {
     GameSettings settings = const GameSettings(),
+    Map<int, AiDifficulty> aiConfig = const {},
   }) {
+    _aiConfig = Map.from(aiConfig);
     _rollReveal = null;
     _state = _manager.createGame(playerNames: playerNames, settings: settings);
     _save();
@@ -152,6 +158,12 @@ class GameNotifier extends ChangeNotifier {
 
   bool get hasStealOpportunity =>
       _state != null && _manager.hasStealOpportunity(_state!);
+
+  bool get isCurrentPlayerAi =>
+      _state != null && _aiConfig.containsKey(_state!.currentPlayerIndex);
+
+  AiDifficulty? get currentPlayerAiDifficulty =>
+      _state != null ? _aiConfig[_state!.currentPlayerIndex] : null;
 
   @override
   void dispose() {
