@@ -374,6 +374,68 @@ void main() {
   });
 
   // ===========================================================================
+  // TIER HISTORY
+  // ===========================================================================
+  group('Tier History', () {
+    test('TH-01: initial bank from 0 does not add to tierHistory', () {
+      final p = makePlayer('p1');
+      manager.bank(players: [p], bankingPlayer: p, amount: 400);
+      expect(p.tierHistory, isEmpty);
+    });
+
+    test('TH-02: second bank freezes first tier with its X count', () {
+      final p = makePlayer('p1');
+      manager.bank(players: [p], bankingPlayer: p, amount: 400);
+      manager.recordX(players: [p], player: p); // xCount = 1
+      manager.bank(players: [p], bankingPlayer: p, amount: 500);
+      expect(p.tierHistory.length, 1);
+      expect(p.tierHistory.first.score, 400);
+      expect(p.tierHistory.first.xCount, 1);
+      expect(p.tierHistory.first.burned, false);
+    });
+
+    test('TH-03: banking with 0 X marks freezes xCount=0', () {
+      final p = makePlayer('p1');
+      manager.bank(players: [p], bankingPlayer: p, amount: 400);
+      manager.bank(players: [p], bankingPlayer: p, amount: 500);
+      expect(p.tierHistory.first.xCount, 0);
+    });
+
+    test('TH-04: 3-X burn records burned tier with xCount=3', () {
+      final p = makePlayer('p1', tiers: [0, 400, 900], entered: true, xCount: 2);
+      manager.recordX(players: [p], player: p);
+      expect(p.tierHistory.length, 1);
+      expect(p.tierHistory.first.score, 900);
+      expect(p.tierHistory.first.xCount, 3);
+      expect(p.tierHistory.first.burned, true);
+    });
+
+    test('TH-05: 3-X burn at score=0 does not add to tierHistory', () {
+      final p = makePlayer('p1', tiers: [0], entered: false, xCount: 2);
+      manager.recordX(players: [p], player: p);
+      expect(p.tierHistory, isEmpty);
+    });
+
+    test('TH-06: tierHistory grows correctly across bank + burn sequence', () {
+      final p = makePlayer('p1');
+      manager.bank(players: [p], bankingPlayer: p, amount: 400); // tierHistory: []
+      manager.recordX(players: [p], player: p); // xCount=1
+      manager.bank(players: [p], bankingPlayer: p, amount: 500); // freezes 400@1
+      manager.recordX(players: [p], player: p); // xCount=1
+      manager.recordX(players: [p], player: p); // xCount=2
+      manager.recordX(players: [p], player: p); // 3rd X → burns 900@3
+      expect(p.tierHistory.length, 2);
+      expect(p.tierHistory[0].score, 400);
+      expect(p.tierHistory[0].xCount, 1);
+      expect(p.tierHistory[0].burned, false);
+      expect(p.tierHistory[1].score, 900);
+      expect(p.tierHistory[1].xCount, 3);
+      expect(p.tierHistory[1].burned, true);
+      expect(p.currentScore, 400);
+    });
+  });
+
+  // ===========================================================================
   // QUERIES
   // ===========================================================================
   group('Queries', () {

@@ -69,6 +69,7 @@ class GameStateSerializer {
         'scoreTiers': p.scoreTiers.toList(),
         'consecutiveXCount': p.consecutiveXCount,
         'isEntered': p.isEntered,
+        'tierHistory': p.tierHistory.map(_tierRecordToMap).toList(),
       };
 
   static Player _playerFromMap(Map<String, dynamic> map) => Player(
@@ -77,6 +78,23 @@ class GameStateSerializer {
         scoreTiers: (map['scoreTiers'] as List).cast<int>(),
         consecutiveXCount: map['consecutiveXCount'] as int,
         isEntered: map['isEntered'] as bool,
+        tierHistory: ((map['tierHistory'] as List?) ?? [])
+            .map((r) => _tierRecordFromMap(r as Map<String, dynamic>))
+            .toList(),
+      );
+
+  // ── TierRecord ───────────────────────────────────────────────────────────────
+
+  static Map<String, dynamic> _tierRecordToMap(TierRecord r) => {
+        'score': r.score,
+        'xCount': r.xCount,
+        'burned': r.burned,
+      };
+
+  static TierRecord _tierRecordFromMap(Map<String, dynamic> map) => TierRecord(
+        score: map['score'] as int,
+        xCount: map['xCount'] as int,
+        burned: map['burned'] as bool,
       );
 
   // ── GameSettings ────────────────────────────────────────────────────────────

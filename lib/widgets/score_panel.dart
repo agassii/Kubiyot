@@ -79,9 +79,8 @@ class _PlayerCard extends StatelessWidget {
   // ── Tier table ────────────────────────────────────────────────────────────
 
   Widget _buildTable() {
-    // scoreTiers: [0] = not entered; additional elements = banked tier scores.
-    // Reverse so newest (highest) tier appears at the top of the table.
-    final tiers = player.scoreTiers.reversed.where((t) => t > 0).toList();
+    final currentScore = player.currentScore;
+    final history = player.tierHistory.reversed.toList();
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -94,22 +93,20 @@ class _PlayerCard extends StatelessWidget {
           width: isCurrent ? 2 : 1,
         ),
       ),
-      child: tiers.isEmpty
-          ? _buildEmptyRow()
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (int i = 0; i < tiers.length; i++) ...[
-                  if (i > 0)
-                    const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A4A)),
-                  _buildTierRow(tiers[i], isNewestTier: i == 0),
-                ],
-              ],
-            ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          currentScore > 0 ? _buildCurrentTierRow(currentScore) : _buildEmptyRow(),
+          for (final record in history) ...[
+            const Divider(height: 1, thickness: 1, color: Color(0xFF2A2A4A)),
+            _buildHistoryTierRow(record),
+          ],
+        ],
+      ),
     );
   }
 
-  // Not-entered placeholder row.
+  // Not-entered placeholder row (also used when player is burned back to 0).
   Widget _buildEmptyRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
@@ -127,34 +124,50 @@ class _PlayerCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTierRow(int score, {required bool isNewestTier}) {
-    final atRisk = isNewestTier && player.consecutiveXCount == 2;
-
-    final Color scoreColor;
-    if (atRisk) {
-      scoreColor = const Color(0xFFFF9F1C);
-    } else if (isNewestTier) {
-      scoreColor = isCurrent ? Colors.white : Colors.white70;
-    } else {
-      scoreColor = const Color(0xFF374151);
-    }
-
+  Widget _buildCurrentTierRow(int score) {
+    final atRisk = player.consecutiveXCount == 2;
     return Padding(
-      padding: EdgeInsets.fromLTRB(10, isNewestTier ? 8 : 5, 8, isNewestTier ? 8 : 5),
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
       child: Row(
         children: [
           Expanded(
             child: Text(
               _fmt(score),
               style: TextStyle(
-                color: scoreColor,
-                fontSize: isNewestTier ? 20 : 12,
-                fontWeight: isNewestTier ? FontWeight.bold : FontWeight.normal,
+                color: atRisk
+                    ? const Color(0xFFFF9F1C)
+                    : (isCurrent ? Colors.white : Colors.white70),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
                 height: 1.1,
               ),
             ),
           ),
-          _XMarks(count: isNewestTier ? player.consecutiveXCount : 0),
+          _XMarks(count: player.consecutiveXCount),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryTierRow(TierRecord record) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _fmt(record.score),
+              style: TextStyle(
+                color: const Color(0xFF374151),
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+                height: 1.1,
+                decoration: record.burned ? TextDecoration.lineThrough : null,
+                decorationColor: const Color(0xFF374151),
+              ),
+            ),
+          ),
+          _XMarks(count: record.xCount),
         ],
       ),
     );

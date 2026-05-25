@@ -31,6 +31,16 @@ void _expectPlayersMatch(List<Player> a, List<Player> b) {
     expect(a[i].consecutiveXCount, b[i].consecutiveXCount,
         reason: 'player[$i].consecutiveXCount');
     expect(a[i].isEntered, b[i].isEntered, reason: 'player[$i].isEntered');
+    expect(a[i].tierHistory.length, b[i].tierHistory.length,
+        reason: 'player[$i].tierHistory.length');
+    for (int j = 0; j < a[i].tierHistory.length; j++) {
+      expect(a[i].tierHistory[j].score, b[i].tierHistory[j].score,
+          reason: 'player[$i].tierHistory[$j].score');
+      expect(a[i].tierHistory[j].xCount, b[i].tierHistory[j].xCount,
+          reason: 'player[$i].tierHistory[$j].xCount');
+      expect(a[i].tierHistory[j].burned, b[i].tierHistory[j].burned,
+          reason: 'player[$i].tierHistory[$j].burned');
+    }
   }
 }
 
@@ -318,6 +328,35 @@ void main() {
         r.activeTurn!.setAsideDice.length,
         game.activeTurn!.setAsideDice.length,
       );
+    });
+
+    test('SS-12: player tierHistory round-trips correctly', () {
+      final alice = Player(
+        id: 'p1',
+        displayName: 'Alice',
+        scoreTiers: [0, 900],
+        consecutiveXCount: 1,
+        isEntered: true,
+        tierHistory: [
+          const TierRecord(score: 400, xCount: 1),
+          const TierRecord(score: 900, xCount: 3, burned: true),
+        ],
+      );
+      final game = GameState(
+        gameId: 'g1',
+        players: [alice, Player(id: 'p2', displayName: 'Bob')],
+        settings: const GameSettings(),
+        phase: GamePhase.inProgress,
+      );
+      final r = _restore(game);
+      final p = r.players[0];
+      expect(p.tierHistory.length, 2);
+      expect(p.tierHistory[0].score, 400);
+      expect(p.tierHistory[0].xCount, 1);
+      expect(p.tierHistory[0].burned, false);
+      expect(p.tierHistory[1].score, 900);
+      expect(p.tierHistory[1].xCount, 3);
+      expect(p.tierHistory[1].burned, true);
     });
 
     test('SS-11: encode/decode (JSON string path)', () {

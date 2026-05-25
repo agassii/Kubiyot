@@ -15,6 +15,22 @@
 // =============================================================================
 
 // -----------------------------------------------------------------------------
+// TIER RECORD — display-only snapshot of a completed tier
+// -----------------------------------------------------------------------------
+
+class TierRecord {
+  final int score;
+  final int xCount;  // X marks accumulated while this tier was active (0-3)
+  final bool burned; // true = lost to 3-X rule (shows ●●● + strikethrough)
+
+  const TierRecord({
+    required this.score,
+    required this.xCount,
+    this.burned = false,
+  });
+}
+
+// -----------------------------------------------------------------------------
 // PLAYER MODEL
 // -----------------------------------------------------------------------------
 
@@ -40,13 +56,21 @@ class Player {
   // Per Constraint #3: entry immunity is permanent for the whole game.
   bool isEntered;
 
+  // ── Tier History (display-only) ───────────────────────────────────────────
+  // Snapshot of every tier the player has left behind, in chronological order.
+  // Updated when banking over a tier or when a tier is burned by the 3-X rule.
+  // Engine logic never reads this list — it exists solely for UI rendering.
+  final List<TierRecord> tierHistory;
+
   Player({
     required this.id,
     required this.displayName,
     List<int>? scoreTiers,
     this.consecutiveXCount = 0,
     this.isEntered = false,
-  }) : scoreTiers = scoreTiers ?? [0];
+    List<TierRecord>? tierHistory,
+  }) : scoreTiers = scoreTiers ?? [0],
+       tierHistory = tierHistory ?? [];
 
   // ── Computed Properties ──────────────────────────────────────────────────────
 
@@ -141,6 +165,12 @@ class PlayerManager {
 
     // Win condition.
     if (newScore == 10000) {
+      if (scoreBefore > 0) {
+        bankingPlayer.tierHistory.add(TierRecord(
+          score: scoreBefore,
+          xCount: bankingPlayer.consecutiveXCount,
+        ));
+      }
       bankingPlayer.scoreTiers.add(newScore);
       bankingPlayer.consecutiveXCount = 0;
       _markEntered(bankingPlayer);
@@ -160,6 +190,12 @@ class PlayerManager {
     }
 
     // Normal bank.
+    if (scoreBefore > 0) {
+      bankingPlayer.tierHistory.add(TierRecord(
+        score: scoreBefore,
+        xCount: bankingPlayer.consecutiveXCount,
+      ));
+    }
     bankingPlayer.scoreTiers.add(newScore);
     bankingPlayer.consecutiveXCount = 0;
     _markEntered(bankingPlayer);
@@ -205,6 +241,13 @@ class PlayerManager {
 
     // 3-X Rule: third consecutive X burns the current tier.
     if (player.consecutiveXCount >= 3) {
+      if (scoreBefore > 0) {
+        player.tierHistory.add(TierRecord(
+          score: scoreBefore,
+          xCount: 3,
+          burned: true,
+        ));
+      }
       player.consecutiveXCount = 0;
 
       // Drop to previous tier.
